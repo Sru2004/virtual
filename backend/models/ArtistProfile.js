@@ -1,0 +1,61 @@
+const mongoose = require('mongoose');
+
+const artistProfileSchema = new mongoose.Schema({
+  user_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  artist_name: {
+    type: String,
+    required: true
+  },
+  bio: {
+    type: String,
+    minlength: 200,
+    maxlength: 300
+  },
+  portfolio_link: String,
+  art_style: String,
+  location: String,
+  social_links: {
+    type: Map,
+    of: String
+  },
+  verification_badge: {
+    type: Boolean,
+    default: false
+  },
+  years_experience: {
+    type: Number,
+    default: 0
+  },
+  exhibitions: {
+    type: Number,
+    default: 0
+  },
+  awards_won: {
+    type: Number,
+    default: 0
+  },
+  artworks_sold: {
+    type: Number,
+    default: 0
+  },
+  total_sales: {
+    type: Number,
+    default: 0
+  },
+  avg_rating: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 5
+  },
+  created_at: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+module.exports = mongoose.model('ArtistProfile', artistProfileSchema);

@@ -1,0 +1,102 @@
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { User, ArtistProfile } from '../lib/api.js';
+import { getCurrentProfile, getArtistProfile } from '../lib/auth.js';
+import { api } from '../lib/api.js';
+
+const AuthContext = createContext(undefined);
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [artistProfile, setArtistProfile] = useState(undefined);
+  const [loading, setLoading] = useState(true);
+
+  const isAdmin = profile?.user_type === 'admin';
+
+  const loadProfile = async (currentUser) => {
+    try {
+      const userProfile = await getCurrentProfile();
+      setProfile(userProfile);
+
+      if (userProfile?.user_type === 'artist') {
+        const artistData = await getArtistProfile(userProfile.id);
+        setArtistProfile(artistData);
+      } else {
+        setArtistProfile(null);
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (user) {
+      await loadProfile(user);
+    }
+  };
+
+  const login = async (credentials) => {
+    try {
+      console.log('AuthContext: Attempting login...');
+      const response = await api.login(credentials);
+      console.log('AuthContext: Login successful, response:', response);
+      setUser(response.user);
+      await loadProfile(response.user);
+      localStorage.setItem('token', response.token);
+      api.setToken(response.token);
+      console.log('AuthContext: Login complete');
+      return response;
+    } catch (error) {
+      console.error('AuthContext: Login error:', error);
+      throw error;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await api.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Always clear local state regardless of API call success
+      setUser(null);
+      setProfile(null);
+      setArtistProfile(null);
+      localStorage.removeItem('token');
+    }
+  };
+
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const currentUser = await getCurrentProfile();
+        if (currentUser) {
+          setUser(currentUser);
+          await loadProfile(currentUser);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        // Clear any invalid tokens
+        localStorage.removeItem('token');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ user, profile, artistProfile, loading, isAdmin, login, logout, refreshProfile }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
