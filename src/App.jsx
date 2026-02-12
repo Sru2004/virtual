@@ -7,11 +7,10 @@ import HomePage from './components/HomePage.jsx';
 import LoginSelect from './components/LoginSelect.jsx';
 import ArtistAuth from './components/ArtistAuth.jsx';
 import UserAuth from './components/UserAuth.jsx';
-import ArtistProfile from './components/ArtistProfile.jsx';
+import ArtistProfileDashboard from './components/ArtistProfileDashboard.jsx';
 import EditArtistProfile from './components/EditArtistProfile.jsx';
 import UserProfile from './components/UserProfile.jsx';
 import UserDashboard from './components/UserDashboard.jsx';
-import ArtistDashboard from './components/ArtistDashboard.jsx';
 import AdminLogin from './components/AdminLogin.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
 import AdminLayout from './components/AdminLayout.jsx';
@@ -73,18 +72,14 @@ function App() {
               </>
             </ProtectedUserRoute>
           } />
-          <Route path="/artist/dashboard" element={
-            <ProtectedArtistRoute>
-              <ArtistDashboard />
-            </ProtectedArtistRoute>
-          } />
           <Route path="/artist/profile" element={
             <ProtectedArtistRoute>
-              <>
-                <Navbar />
-                <ArtistProfile />
-                <Footer onNavigate={(page) => window.location.href = `/${page}`} />
-              </>
+              <ArtistProfileDashboard />
+            </ProtectedArtistRoute>
+          } />
+          <Route path="/artist/dashboard" element={
+            <ProtectedArtistRoute>
+              <ArtistProfileDashboard />
             </ProtectedArtistRoute>
           } />
           <Route path="/artwork-details/:id" element={

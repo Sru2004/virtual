@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   User,
   Edit,
@@ -16,11 +17,14 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
+import { toastError, toastWarning, toastSuccess } from '../lib/toast';
 
 const EditArtistProfile = () => {
+  const navigate = useNavigate();
   const { profile, artistProfile, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState(null);
 
   const [formData, setFormData] = useState({
     artist_name: '',
@@ -104,12 +108,12 @@ const EditArtistProfile = () => {
 
     // Validate required fields
     if (!uploadForm.title || !uploadForm.category || !uploadForm.price) {
-      alert('Please fill in all required fields (Title, Category, Price)');
+      toastError('Please fill in all required fields (Title, Category, Price)');
       return;
     }
 
     if (!uploadForm.image_file && !uploadForm.image_url) {
-      alert('Please provide either an image file or image URL');
+      toastError('Please provide either an image file or image URL');
       return;
     }
 
@@ -162,7 +166,15 @@ const EditArtistProfile = () => {
       setTimeout(() => setUploadSuccess(false), 3000);
     } catch (error) {
       console.error('Error uploading artwork:', error);
-      alert('Failed to upload artwork. Please try again.');
+      
+      // Handle duplicate detection errors with better messaging
+      if (error.message && error.message.includes('already been uploaded')) {
+        toastError('Duplicate Image Detected: This image has already been uploaded to the gallery. Please choose a different image.');
+      } else if (error.message && error.message.includes('similar image')) {
+        toastError('Similar Image Detected: A very similar image already exists in the gallery. Please upload a different artwork to maintain uniqueness.');
+      } else {
+        toastError(error.message || 'Failed to upload artwork. Please try again.');
+      }
     } finally {
       setUploading(false);
     }
@@ -171,22 +183,43 @@ const EditArtistProfile = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!profile?.id) {
-      alert('Profile not loaded. Please try again.');
+      setError('Profile not loaded. Please try again.');
       return;
     }
+    
+    // If no artist profile exists, create one first
+    if (!artistProfile?.id) {
+      try {
+        setLoading(true);
+        const response = await api.createArtistProfile(formData);
+        await refreshProfile();
+        setSuccess(true);
+        setTimeout(() => {
+          navigate('/artist/profile');
+        }, 1500);
+        return;
+      } catch (error) {
+        console.error('Error creating artist profile:', error);
+        setError(error.message || 'Failed to create profile. Please try again.');
+        setLoading(false);
+        return;
+      }
+    }
+    
     setLoading(true);
     setSuccess(false);
+    setError(null);
 
     try {
-      await api.updateArtistProfile(profile.id, formData);
+      await api.updateArtistProfile(artistProfile.id, formData);
       await refreshProfile();
       setSuccess(true);
       setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('navigate', { detail: 'artist-dashboard' }));
-      }, 2000);
+        navigate('/artist/profile');
+      }, 1500);
     } catch (error) {
       console.error('Error updating artist profile:', error);
-      alert('Failed to update profile. Please try again.');
+      setError(error.message || 'Failed to update profile. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -221,6 +254,12 @@ const EditArtistProfile = () => {
           {uploadSuccess && (
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-green-800 font-medium">Artwork uploaded successfully!</p>
+            </div>
+          )}
+
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-800 font-medium">{error}</p>
             </div>
           )}
 
@@ -325,7 +364,7 @@ const EditArtistProfile = () => {
 
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="flex text-sm font-medium text-gray-700 mb-2 items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     Years of Experience
                   </label>
@@ -339,7 +378,7 @@ const EditArtistProfile = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="flex text-sm font-medium text-gray-700 mb-2 items-center gap-2">
                     <Image className="h-4 w-4" />
                     Exhibitions
                   </label>
@@ -353,7 +392,7 @@ const EditArtistProfile = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="flex text-sm font-medium text-gray-700 mb-2 items-center gap-2">
                     <Trophy className="h-4 w-4" />
                     Awards Won
                   </label>
@@ -367,7 +406,7 @@ const EditArtistProfile = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="flex text-sm font-medium text-gray-700 mb-2 items-center gap-2">
                     <Upload className="h-4 w-4" />
                     Artworks Sold
                   </label>
@@ -391,7 +430,7 @@ const EditArtistProfile = () => {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="flex text-sm font-medium text-gray-700 mb-2 items-center gap-2">
                     <Instagram className="h-4 w-4" />
                     Instagram
                   </label>
@@ -405,7 +444,7 @@ const EditArtistProfile = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="flex text-sm font-medium text-gray-700 mb-2 items-center gap-2">
                     <Facebook className="h-4 w-4" />
                     Facebook
                   </label>
@@ -419,7 +458,7 @@ const EditArtistProfile = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="flex text-sm font-medium text-gray-700 mb-2 items-center gap-2">
                     <Globe className="h-4 w-4" />
                     Website
                   </label>

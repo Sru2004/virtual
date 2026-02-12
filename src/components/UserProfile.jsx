@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
+import { toastSuccess, toastError } from '../lib/toast';
 
 const UserProfile = () => {
   const { user, profile, logout, refreshProfile } = useAuth();
@@ -134,10 +135,10 @@ const UserProfile = () => {
       // Refresh the auth context to update navbar
       await refreshProfile();
 
-      alert('Profile updated successfully!');
+      toastSuccess('Profile updated successfully!');
     } catch (error) {
       console.error('Error updating profile:', error);
-      alert('Failed to update profile. Please try again.');
+      toastError('Failed to update profile. Please try again.');
     }
   };
 
@@ -221,14 +222,7 @@ const UserProfile = () => {
                 })}
               </nav>
 
-              {/* Logout Button */}
-              <button
-                onClick={logout}
-                className="w-full flex items-center gap-3 p-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              >
-                <LogOut className="h-5 w-5" />
-                <span className="font-medium">Logout</span>
-              </button>
+              {/* Logout removed: use profile dropdown logout in Navbar only */}
 
 
             </div>
@@ -414,57 +408,9 @@ const UserProfile = () => {
                     </div>
                   </div>
 
-                  <div className="flex gap-4 mb-8">
-                    {!isEditing ? (
-                      <button
-                        onClick={() => setIsEditing(true)}
-                        className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                      >
-                        <Edit className="h-4 w-4" />
-                        Edit Profile
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          onClick={handleSaveChanges}
-                          className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={!formData.firstName.trim() || !formData.lastName.trim()}
-                        >
-                          <Save className="h-4 w-4" />
-                          Save Changes
-                        </button>
-                        <button
-                          onClick={() => {
-                            setIsEditing(false);
-                            loadProfileData();
-                          }}
-                          className="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={() => {
-                            setIsEditing(false);
-                            loadProfileData();
-                          }}
-                          className="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    )}
-                  </div>
+                  {/* Edit Profile removed: use profile dropdown in Navbar only */}
 
-                  {/* Logout Button */}
-                  <div className="flex justify-center mb-8">
-                    <button
-                      onClick={logout}
-                      className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Logout
-                    </button>
-                  </div>
+                  {/* Logout removed: use profile dropdown logout in Navbar only */}
 
                   {/* FAQ Section */}
                   <div className="border-t border-gray-200 pt-8">

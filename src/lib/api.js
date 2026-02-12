@@ -31,6 +31,7 @@ class ApiClient {
     const response = await fetch(url, {
       ...options,
       headers,
+      cache: 'no-cache',
     });
 
     if (!response.ok) {
@@ -100,66 +101,6 @@ class ApiClient {
     });
   }
 
-  // Artwork endpoints
-  async getAllArtworks() {
-    return this.request('/artworks');
-  }
-
-  async getArtwork(id) {
-    return this.request(`/artworks/${id}`);
-  }
-
-  async updateArtwork(id, updates) {
-    return this.request(`/artworks/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    });
-  }
-
-  async deleteArtwork(id) {
-    return this.request(`/artworks/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Order endpoints
-  async getAllOrders() {
-    return this.request('/orders');
-  }
-
-  async getOrder(id) {
-    return this.request(`/orders/${id}`);
-  }
-
-  async updateOrder(id, updates) {
-    return this.request(`/orders/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    });
-  }
-
-  // Review endpoints
-  async getAllReviews() {
-    return this.request('/reviews');
-  }
-
-  async getReview(id) {
-    return this.request(`/reviews/${id}`);
-  }
-
-  async updateReview(id, updates) {
-    return this.request(`/reviews/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    });
-  }
-
-  async deleteReview(id) {
-    return this.request(`/reviews/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
   // Artist profile endpoints
   async getArtistProfiles() {
     return this.request('/artist-profiles');
@@ -167,6 +108,17 @@ class ApiClient {
 
   async getArtistProfile(id) {
     return this.request(`/artist-profiles/${id}`);
+  }
+
+  async getArtistProfileByUserId(userId) {
+    return this.request(`/artist-profiles/user/${userId}`);
+  }
+
+  async createArtistProfile(data) {
+    return this.request('/artist-profiles', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   async updateArtistProfile(id, updates) {
@@ -188,16 +140,16 @@ class ApiClient {
     return this.request(`/artworks${query}`);
   }
 
+  async getArtwork(id) {
+    return this.request(`/artworks/${id}`);
+  }
+
   async getMyArtworks() {
     return this.request('/artworks/my-artworks');
   }
 
   async getAllArtworks() {
     return this.request('/artworks');
-  }
-
-  async getArtwork(id) {
-    return this.request(`/artworks/${id}`);
   }
 
   async createArtwork(data) {
@@ -252,27 +204,10 @@ class ApiClient {
     return this.request('/orders');
   }
 
-  async getOrder(id) {
-    return this.request(`/orders/${id}`);
-  }
-
   async createOrder(data) {
     return this.request('/orders', {
       method: 'POST',
       body: JSON.stringify(data),
-    });
-  }
-
-  async updateOrder(id, updates) {
-    return this.request(`/orders/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    });
-  }
-
-  async deleteOrder(id) {
-    return this.request(`/orders/${id}`, {
-      method: 'DELETE',
     });
   }
 
@@ -285,27 +220,10 @@ class ApiClient {
     return this.request('/reviews');
   }
 
-  async getReview(id) {
-    return this.request(`/reviews/${id}`);
-  }
-
   async createReview(data) {
     return this.request('/reviews', {
       method: 'POST',
       body: JSON.stringify(data),
-    });
-  }
-
-  async updateReview(id, updates) {
-    return this.request(`/reviews/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    });
-  }
-
-  async deleteReview(id) {
-    return this.request(`/reviews/${id}`, {
-      method: 'DELETE',
     });
   }
 

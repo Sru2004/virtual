@@ -128,7 +128,7 @@ router.post('/', auth, async (req, res) => {
     const order = new Order({
       user_id: userId,
       items: orderItems,
-      amount: totalAmount,
+      total_amount: totalAmount,
       address: address,
       paymentType: paymentMethod ? 'Online' : 'COD'
     });

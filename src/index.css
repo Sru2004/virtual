@@ -1,3 +1,28 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* =========================
+   Rainbow animation & white glow
+   ========================= */
+
+/* Strong white text shadow */
+.text-shadow-white {
+  text-shadow:
+    0 0 1px #ffffff,
+    0 0 2px #ffffff,
+    0 0 3px #ffffff,
+    0 0 4px #ffffff,
+    0 0 5px #ffffff;
+}
+
+/* Rainbow animation */
+@keyframes rainbow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-rainbow {
+  background-size: 300% 300%;
+  animation: rainbow 5s linear infinite;
+}

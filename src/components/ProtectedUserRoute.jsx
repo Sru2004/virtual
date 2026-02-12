@@ -20,12 +20,7 @@ const ProtectedUserRoute = ({ children }) => {
     );
   }
 
-  if (!profile) {
-    console.log('ProtectedUserRoute: No profile, redirecting to login');
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  if (profile.user_type !== 'user') {
+  if (profile && profile.user_type !== 'user') {
     console.log('ProtectedUserRoute: Not a user, redirecting to home');
     return <Navigate to="/" replace />;
   }

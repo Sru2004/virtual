@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import { Star, Heart, ShoppingCart, ArrowLeft, MapPin, Calendar, Award, User, Eye } from 'lucide-react';
+import { toastSuccess, toastError } from '../lib/toast';
 
 const ArtworkDetails = ({ onBack }) => {
   const { id } = useParams();
@@ -12,6 +13,7 @@ const ArtworkDetails = ({ onBack }) => {
   const [artwork, setArtwork] = useState(null);
   const [artist, setArtist] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [relatedArtworks, setRelatedArtworks] = useState([]);
 
@@ -79,12 +81,12 @@ const ArtworkDetails = ({ onBack }) => {
       window.dispatchEvent(new Event('storage'));
 
       // Show success message
-      alert(`Added "${artwork.title}" to cart!`);
+      toastSuccess(`Added "${artwork.title}" to cart!`);
       // Navigate to cart page
       navigate('/cart');
     } catch (error) {
       console.error('Error adding to cart:', error);
-      alert('Failed to add item to cart. Please try again.');
+      toastError('Failed to add item to cart. Please try again.');
     }
   };
 
@@ -115,16 +117,18 @@ const ArtworkDetails = ({ onBack }) => {
     );
   }
 
-  if (!artwork) {
+  if (error || !artwork) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 text-lg">Artwork not found</p>
+          <p className="text-gray-600 text-lg">
+            {error || "Artwork not found or you don't have permission to view it"}
+          </p>
           <button
             onClick={() => navigate('/user/dashboard')}
             className="mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
           >
-            Go Back
+            Go Back to Dashboard
           </button>
         </div>
       </div>
@@ -340,7 +344,7 @@ const ArtworkDetails = ({ onBack }) => {
                 <div
                   key={relatedArt._id}
                   className="bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => navigate(`/artwork/${relatedArt._id}`)}
+                  onClick={() => navigate(`/artwork-details/${relatedArt._id}`)}
                 >
                   <div className="h-48 bg-gray-200">
                     <img

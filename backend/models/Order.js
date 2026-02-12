@@ -20,7 +20,7 @@ const orderSchema = new mongoose.Schema({
     required: true
   },
   items: [orderItemSchema],
-  amount: {
+  total_amount: {
     type: Number,
     required: true,
     min: 0
@@ -45,6 +45,10 @@ const orderSchema = new mongoose.Schema({
     default: Date.now
   },
   created_at: {
+    type: Date,
+    default: Date.now
+  },
+  updated_at: {
     type: Date,
     default: Date.now
   }

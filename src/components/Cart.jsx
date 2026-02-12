@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 
 const Cart = () => {
     const { profile } = useAuth();
+    const navigate = useNavigate();
     const [cartItems, setCartItems] = useState({});
     const [artworks, setArtworks] = useState([]);
     const [cartArray, setCartArray] = useState([]);
@@ -13,8 +14,20 @@ const Cart = () => {
     const [showAddress, setShowAddress] = useState(false);
     const [selectedAddress, setSelectedAddress] = useState(null);
     const [paymentOption, setPaymentOption] = useState("COD");
+    const [showAddressForm, setShowAddressForm] = useState(false);
+    const [addressForm, setAddressForm] = useState({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        street: '',
+        city: '',
+        state: '',
+        zipCode: '',
+        country: ''
+    });
 
-    const getCart = () => {
+    const getCart = useCallback(() => {
         let tempArray = [];
         for (const key in cartItems) {
             const artwork = artworks.find((item) => item._id === key);
@@ -24,7 +37,7 @@ const Cart = () => {
             }
         }
         setCartArray(tempArray);
-    };
+    }, [artworks, cartItems]);
 
     const getUserAddress = async () => {
         try {
@@ -39,6 +52,62 @@ const Cart = () => {
             }
         } catch (error) {
             console.error('Error fetching addresses:', error);
+        }
+    };
+
+    const handleAddressFormChange = (e) => {
+        const { name, value } = e.target;
+        setAddressForm(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const saveAddress = async (e) => {
+        e.preventDefault();
+
+        // Validate required fields
+        const requiredFields = ['firstName', 'lastName', 'email', 'phone', 'street', 'city', 'state', 'zipCode', 'country'];
+        const missingFields = requiredFields.filter(field => !addressForm[field].trim());
+
+        if (missingFields.length > 0) {
+            toast.error(`Please fill in all required fields: ${missingFields.join(', ')}`);
+            return;
+        }
+
+        // Validate email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(addressForm.email)) {
+            toast.error('Please enter a valid email address');
+            return;
+        }
+
+        try {
+            const data = await api.createAddress(addressForm);
+            if (data.success) {
+                toast.success('Address added successfully');
+                setShowAddressForm(false);
+                setAddressForm({
+                    firstName: '',
+                    lastName: '',
+                    email: '',
+                    phone: '',
+                    street: '',
+                    city: '',
+                    state: '',
+                    zipCode: '',
+                    country: ''
+                });
+                // Refresh addresses
+                await getUserAddress();
+                // Dispatch event to refresh addresses in other components
+                window.dispatchEvent(new CustomEvent('addressAdded'));
+            } else {
+                toast.error(data.message);
+            }
+        } catch (error) {
+            console.error('Error saving address:', error);
+            toast.error(error.message || 'Failed to save address');
         }
     };
 
@@ -60,7 +129,7 @@ const Cart = () => {
                     setCartItems({});
                     localStorage.removeItem('cartItems');
                     // Dispatch custom event to update navbar cart count
-                    window.dispatchEvent(new Event('storage'));
+                    window.dispatchEvent(new CustomEvent('cartUpdated'));
                     // Navigate to orders page
                     navigate('/my-orders');
                 } else {
@@ -103,10 +172,6 @@ const Cart = () => {
         window.dispatchEvent(new Event('storage'));
     };
 
-    const getCartCount = () => {
-        return Object.values(cartItems).reduce((total, qty) => total + qty, 0);
-    };
-
     const getCartAmount = () => {
         return cartArray.reduce((total, item) => total + (item.price * item.quantity), 0);
     };
@@ -122,10 +187,36 @@ const Cart = () => {
         };
         fetchArtworks();
 
-        // Load cart from localStorage
+        // Load cart from localStorage - ensure it's valid
         const savedCart = localStorage.getItem('cartItems');
         if (savedCart) {
-            setCartItems(JSON.parse(savedCart));
+            try {
+                const parsedCart = JSON.parse(savedCart);
+                // Validate that cart items are objects with valid quantities
+                const validCart = {};
+                for (const [key, value] of Object.entries(parsedCart)) {
+                    if (typeof value === 'number' && value > 0 && value <= 99) {
+                        validCart[key] = value;
+                    }
+                }
+                setCartItems(validCart);
+                // If cart is empty after validation, clear localStorage
+                if (Object.keys(validCart).length === 0) {
+                    localStorage.removeItem('cartItems');
+                } else {
+                    // Update localStorage with cleaned data
+                    localStorage.setItem('cartItems', JSON.stringify(validCart));
+                }
+            } catch (error) {
+                console.error('Error parsing cart data:', error);
+                // Clear corrupted cart data
+                localStorage.removeItem('cartItems');
+                setCartItems({});
+            }
+        } else {
+            // Ensure cart starts empty and localStorage is clear
+            setCartItems({});
+            localStorage.removeItem('cartItems');
         }
     }, []);
 
@@ -133,7 +224,7 @@ const Cart = () => {
         if (artworks.length > 0 && Object.keys(cartItems).length > 0) {
             getCart();
         }
-    }, [artworks, cartItems]);
+    }, [artworks, cartItems, getCart]);
 
     useEffect(() => {
         if (profile) {
@@ -161,7 +252,7 @@ const Cart = () => {
             <div className="flex flex-col md:flex-row gap-8">
                 <div className='flex-1'>
                 <h1 className="text-3xl font-medium mb-6">
-                    Shopping Cart <span className="text-sm text-purple-600">({getCartCount()})</span>
+                    Shopping Cart
                 </h1>
 
                 <div className="grid grid-cols-[2fr_1fr_1fr] text-gray-500 text-base font-medium pb-3">
@@ -170,8 +261,8 @@ const Cart = () => {
                     <p className="text-center">Action</p>
                 </div>
 
-                {cartArray.map((artwork, index) => (
-                    <div key={index} className="grid grid-cols-[2fr_1fr_1fr] text-gray-500 items-center text-sm md:text-base font-medium pt-3">
+                {cartArray.map((artwork) => (
+                    <div key={artwork._id} className="grid grid-cols-[2fr_1fr_1fr] text-gray-500 items-center text-sm md:text-base font-medium pt-3">
                         <div className="flex items-center md:gap-6 gap-3">
                             <div onClick={() => {
                                 navigate(`/artwork-details/${artwork._id}`);
@@ -228,12 +319,12 @@ const Cart = () => {
                         </button>
                         {showAddress && (
                             <div className="absolute top-12 py-1 bg-white border border-gray-300 text-sm w-full">
-                                {addresses.map((address, index) => (
-                                    <p onClick={() => { setSelectedAddress(address); setShowAddress(false); }} className="text-gray-500 p-2 hover:bg-gray-100 cursor-pointer">
+                                {addresses.map((address) => (
+                                    <p onClick={() => { setSelectedAddress(address); setShowAddress(false); }} key={address._id} className="text-gray-500 p-2 hover:bg-gray-100 cursor-pointer">
                                         {address.firstName} {address.lastName}, {address.phone}, {address.street}, {address.city}, {address.state}, {address.country}
                                     </p>
                                 ))}
-                                <p onClick={() => navigate('/add-address')} className="text-purple-600 text-center cursor-pointer p-2 hover:bg-purple-50">
+                                <p onClick={() => { setShowAddressForm(true); setShowAddress(false); }} className="text-purple-600 text-center cursor-pointer p-2 hover:bg-purple-50">
                                     Add address
                                 </p>
                             </div>
@@ -269,6 +360,154 @@ const Cart = () => {
                 </button>
             </div>
         </div>
+
+        {/* Address Form Modal */}
+        {showAddressForm && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-semibold">Add New Address</h3>
+                        <button
+                            onClick={() => setShowAddressForm(false)}
+                            className="text-gray-500 hover:text-gray-700"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <form onSubmit={saveAddress} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+                                <input
+                                    type="text"
+                                    name="firstName"
+                                    value={addressForm.firstName}
+                                    onChange={handleAddressFormChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+                                <input
+                                    type="text"
+                                    name="lastName"
+                                    value={addressForm.lastName}
+                                    onChange={handleAddressFormChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                            <input
+                                type="email"
+                                name="email"
+                                value={addressForm.email}
+                                onChange={handleAddressFormChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+                            <input
+                                type="tel"
+                                name="phone"
+                                value={addressForm.phone}
+                                onChange={handleAddressFormChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Street Address *</label>
+                            <input
+                                type="text"
+                                name="street"
+                                value={addressForm.street}
+                                onChange={handleAddressFormChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                required
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
+                                <input
+                                    type="text"
+                                    name="city"
+                                    value={addressForm.city}
+                                    onChange={handleAddressFormChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
+                                <input
+                                    type="text"
+                                    name="state"
+                                    value={addressForm.state}
+                                    onChange={handleAddressFormChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Zip Code *</label>
+                                <input
+                                    type="text"
+                                    name="zipCode"
+                                    value={addressForm.zipCode}
+                                    onChange={handleAddressFormChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Country *</label>
+                                <input
+                                    type="text"
+                                    name="country"
+                                    value={addressForm.country}
+                                    onChange={handleAddressFormChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 pt-4">
+                            <button
+                                type="button"
+                                onClick={() => setShowAddressForm(false)}
+                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+                            >
+                                Save Address
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        )}
     </div>
     ) : (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">

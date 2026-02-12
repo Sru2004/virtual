@@ -11,7 +11,13 @@ dotenv.config();
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://localhost:5177', 'http://localhost:5178', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5177', 'http://127.0.0.1:5178', 'http://10.67.109.231:5174'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+app.options('*', cors()); // Handle preflight requests
 app.use(express.json());
 
 // Serve static files from uploads directory
@@ -20,45 +26,26 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Function to ensure default admin account exists
-async function ensureDefaultAdmin() {
-  try {
-    const adminEmail = 'admin@example.com';
-    const adminPassword = 'admin123';
 
-    // Check if admin already exists
-    const existingAdmin = await User.findOne({ email: adminEmail });
 
-    if (existingAdmin) {
-      console.log('✅ Default admin account verified:', adminEmail);
-      return;
-    }
-
-    // Create default admin account
-    const hashedPassword = await bcrypt.hash(adminPassword, 12);
-
-    const adminUser = new User({
-      email: adminEmail,
-      password: hashedPassword,
-      full_name: 'Admin User',
-      user_type: 'admin'
-    });
-
-    await adminUser.save();
-    console.log('✅ Default admin account created:', adminEmail, '/', adminPassword);
-  } catch (error) {
-    console.error('❌ Error ensuring default admin account:', error);
-  }
-}
-
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://visual_art:visual%40123@cluster0.lotlyct.mongodb.net/visual_Art?retryWrites=true&w=majority')
-.then(async () => {
-  console.log('MongoDB connected');
-  // Ensure default admin account exists after DB connection
-  await ensureDefaultAdmin();
+// Connect to MongoDB (use MONGODB_URI when provided)
+const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://truptikandalkar0:Radha3992@cluster0.low5vpa.mongodb.net/?appName=Cluster0';
+mongoose.connect(mongoUri, {
+  serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+  socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
 })
-.catch(err => console.error('MongoDB connection error:', err));
+.then(() => {
+  // Try to show only the database name to avoid leaking credentials
+  const dbName = (mongoUri.includes('/') ? mongoUri.split('/').pop().split('?')[0] : '(unknown)') || '(unknown)';
+  console.log(`✅ MongoDB connected successfully (db: ${dbName})`);
+})
+.catch(err => {
+  console.error('❌ MongoDB connection error:', err.message);
+  console.log('🔧 Troubleshooting steps:');
+  console.log('1. Ensure your MongoDB instance is reachable');
+  console.log('2. If using Atlas set `MONGODB_URI` in your .env');
+  console.log('3. Check that the database name in the connection string is correct');
+});
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -69,6 +56,7 @@ app.use('/api/orders', require('./routes/orders'));
 app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/wishlist', require('./routes/wishlist'));
 app.use('/api/address', require('./routes/address'));
+app.use('/api/admin', require('./routes/admin'));
 
 // Health check
 app.get('/api/health', (req, res) => {

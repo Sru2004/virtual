@@ -4,7 +4,7 @@ import { BarChart3, Users, Image, Settings, LogOut, ChevronRight } from 'lucide-
 import { useAuth } from '../contexts/AuthContext';
 
 const AdminLayout = () => {
-  const { profile, logout } = useAuth();
+  const { profile } = useAuth();
   const location = useLocation();
 
   const navigationItems = [
@@ -43,15 +43,7 @@ const AdminLayout = () => {
             );
           })}
         </nav>
-        <div className="absolute bottom-0 w-full p-6">
-          <button
-            onClick={logout}
-            className="w-full flex items-center gap-3 p-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-          >
-            <LogOut className="h-5 w-5" />
-            <span className="font-medium">Logout</span>
-          </button>
-        </div>
+        {/* Logout removed: use Navbar profile dropdown for logout */}
       </div>
 
       {/* Main Content */}

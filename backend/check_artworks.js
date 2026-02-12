@@ -4,9 +4,10 @@ const ArtistProfile = require('./models/ArtistProfile');
 
 async function checkArtworks() {
   try {
-    await mongoose.connect('mongodb://localhost:27017/artgallery', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
+    // Connect using default options (modern driver no longer needs these flags)
+    await mongoose.connect('mongodb+srv://truptikandalkar0:Radha3992@cluster0.low5vpa.mongodb.net/?appName=Cluster0', {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
     });
 
     console.log('Connected to MongoDB');

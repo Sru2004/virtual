@@ -57,7 +57,7 @@ router.post('/register', [
     }
 
     // Generate JWT
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '30d' });
 
     res.status(201).json({ token, user: { id: user._id, email, full_name, user_type } });
   } catch (error) {
@@ -88,9 +88,9 @@ router.post('/login', [
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '30d' });
 
-    res.json({ token, user: { id: user._id, email, full_name: user.full_name, user_type: user.user_type } });
+    res.json({ success: true, token, user: { id: user._id, email, full_name: user.full_name, user_type: user.user_type } });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -105,7 +105,14 @@ router.post('/logout', auth, (req, res) => {
 router.get('/me', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
-    res.json(user);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    // Convert _id to id for consistency
+    res.json({
+      id: user._id,
+      ...user.toObject()
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -118,7 +125,11 @@ router.get('/profile', auth, async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.json(user);
+    // Convert _id to id for consistency
+    res.json({
+      id: user._id,
+      ...user.toObject()
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

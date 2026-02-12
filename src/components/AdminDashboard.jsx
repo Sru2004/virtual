@@ -37,7 +37,7 @@ import {
 } from 'recharts';
 
 const AdminDashboard = () => {
-  const { profile, logout } = useAuth();
+  const { profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [activeSection, setActiveSection] = useState('overview');
@@ -764,14 +764,7 @@ const AdminDashboard = () => {
                 })}
               </nav>
 
-              {/* Logout Button */}
-              <button
-                onClick={logout}
-                className="w-full flex items-center gap-3 p-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              >
-                <LogOut className="h-5 w-5" />
-                <span className="font-medium">Logout</span>
-              </button>
+              {/* Logout removed: use Navbar profile dropdown for logout */}
             </div>
           </div>
 

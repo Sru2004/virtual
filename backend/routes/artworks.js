@@ -1,10 +1,64 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
+const fs = require('fs').promises;
+const http = require('http');
+const https = require('https');
+const path = require('path');
 const Artwork = require('../models/Artwork');
 const ArtistProfile = require('../models/ArtistProfile');
 const { auth } = require('../middleware/auth');
+const { generateNormalizedSHA256Hash, generatePerceptualHash, areSimilarImages } = require('../utils/imageHash');
 
 const router = express.Router();
+
+const MAX_IMAGE_BYTES = Number(process.env.MAX_IMAGE_BYTES || 5242880);
+const MAX_IMAGE_REDIRECTS = 3;
+
+const downloadImageBuffer = (imageUrl, redirectCount = 0) => new Promise((resolve, reject) => {
+  try {
+    const url = new URL(imageUrl);
+    const client = url.protocol === 'https:' ? https : http;
+
+    const req = client.get(url, (res) => {
+      const statusCode = res.statusCode || 0;
+
+      if (statusCode >= 300 && statusCode < 400 && res.headers.location && redirectCount < MAX_IMAGE_REDIRECTS) {
+        res.resume();
+        resolve(downloadImageBuffer(res.headers.location, redirectCount + 1));
+        return;
+      }
+
+      if (statusCode < 200 || statusCode >= 300) {
+        res.resume();
+        reject(new Error('Failed to download image'));
+        return;
+      }
+
+      const chunks = [];
+      let size = 0;
+
+      res.on('data', (chunk) => {
+        size += chunk.length;
+        if (size > MAX_IMAGE_BYTES) {
+          req.destroy(new Error('Image too large'));
+          return;
+        }
+        chunks.push(chunk);
+      });
+
+      res.on('end', () => {
+        resolve(Buffer.concat(chunks));
+      });
+    });
+
+    req.on('error', reject);
+    req.setTimeout(10000, () => {
+      req.destroy(new Error('Image download timeout'));
+    });
+  } catch (error) {
+    reject(error);
+  }
+});
 
 // Get all artworks (published or own)
 router.get('/', auth, async (req, res) => {
@@ -70,11 +124,6 @@ router.get('/', auth, async (req, res) => {
 // Get my artworks (for artist dashboard)
 router.get('/my-artworks', auth, async (req, res) => {
   try {
-    // Only artists can access their own artworks
-    if (req.user.user_type !== 'artist') {
-      return res.status(403).json({ message: 'Only artists can access their artworks' });
-    }
-
     const artistProfile = await ArtistProfile.findOne({ user_id: req.user._id });
 
     // Include both user_id and artist_profile_id if exists
@@ -111,7 +160,22 @@ router.get('/:id', auth, async (req, res) => {
     }
 
     // Check if user can view this artwork
-    if (artwork.status !== 'published' && artwork.artist_id.toString() !== req.user._id.toString() && req.user.user_type !== 'admin') {
+    let canView = false;
+    if (artwork.status === 'published') {
+      canView = true;
+    } else if (req.user.user_type === 'admin') {
+      canView = true;
+    } else {
+      // Check if user is the artist
+      const artistProfile = await ArtistProfile.findOne({ user_id: req.user._id });
+      const userArtistIds = [req.user._id];
+      if (artistProfile) userArtistIds.push(artistProfile._id);
+      if (userArtistIds.some(id => id.toString() === artwork.artist_id._id.toString())) {
+        canView = true;
+      }
+    }
+
+    if (!canView) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -150,9 +214,49 @@ router.post('/', auth, [
       artistId = artistProfile._id;
     }
 
+    const imageUrl = req.body.image_url;
+    const fileBuffer = await downloadImageBuffer(imageUrl);
+
+    const imageHash = await generateNormalizedSHA256Hash(fileBuffer);
+    console.log('Generated SHA-256 hash:', imageHash);
+
+    const perceptualHash = await generatePerceptualHash(fileBuffer);
+    console.log('Generated perceptual hash:', perceptualHash || 'N/A');
+
+    const exactDuplicate = await Artwork.findOne({ imageHash }).select('_id artist_id');
+    if (exactDuplicate) {
+      return res.status(409).json({
+        success: false,
+        errorType: 'DUPLICATE_IMAGE',
+        message: 'Duplicate or visually similar image detected'
+      });
+    }
+
+    if (perceptualHash) {
+      const similarityThreshold = Number(process.env.IMAGE_SIMILARITY_THRESHOLD || 8);
+      const allArtworks = await Artwork.find({ perceptualHash: { $exists: true, $ne: null } })
+        .select('perceptualHash artist_id')
+        .limit(2000);
+
+      for (const artwork of allArtworks) {
+        if (areSimilarImages(perceptualHash, artwork.perceptualHash, similarityThreshold)) {
+          const isDifferentArtist = artwork.artist_id?.toString() !== artistId?.toString();
+          return res.status(409).json({
+            success: false,
+            errorType: 'DUPLICATE_IMAGE',
+            message: isDifferentArtist
+              ? 'This image already exists on the platform'
+              : 'Duplicate or visually similar image detected'
+          });
+        }
+      }
+    }
+
     const artwork = new Artwork({
       ...req.body,
-      artist_id: artistId
+      artist_id: artistId,
+      imageHash,
+      perceptualHash
     });
 
     await artwork.save();
@@ -171,6 +275,14 @@ router.post('/', auth, [
 
     res.status(201).json(artwork);
   } catch (error) {
+    if (error.code === 11000 && (error.keyPattern?.imageHash || error.keyValue?.imageHash)) {
+      return res.status(409).json({
+        success: false,
+        errorType: 'DUPLICATE_IMAGE',
+        message: 'Duplicate or visually similar image detected'
+      });
+    }
+
     res.status(500).json({ message: error.message });
   }
 });
@@ -194,7 +306,20 @@ router.put('/:id', auth, [
     }
 
     // Check if user can update this artwork
-    if (artwork.artist_id.toString() !== req.user._id.toString() && req.user.user_type !== 'admin') {
+    let canUpdate = false;
+    if (req.user.user_type === 'admin') {
+      canUpdate = true;
+    } else {
+      // Check if user is the artist
+      const artistProfile = await ArtistProfile.findOne({ user_id: req.user._id });
+      const userArtistIds = [req.user._id];
+      if (artistProfile) userArtistIds.push(artistProfile._id);
+      if (userArtistIds.some(id => id.toString() === artwork.artist_id.toString())) {
+        canUpdate = true;
+      }
+    }
+
+    if (!canUpdate) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -211,22 +336,63 @@ router.put('/:id', auth, [
 // Delete artwork
 router.delete('/:id', auth, async (req, res) => {
   try {
-    const artwork = await Artwork.findById(req.params.id);
+    console.log('Delete request for artwork:', req.params.id);
+    console.log('User:', req.user._id, req.user.user_type);
+
+    const artwork = await Artwork.findById(req.params.id).populate('artist_id');
     if (!artwork) {
+      console.log('Artwork not found');
       return res.status(404).json({ message: 'Artwork not found' });
     }
 
+    console.log('Artwork artist_id:', artwork.artist_id);
+
     // Check if user can delete this artwork
-    if (artwork.artist_id.toString() !== req.user._id.toString() && req.user.user_type !== 'admin') {
+    let canDelete = false;
+    if (req.user.user_type === 'admin') {
+      canDelete = true;
+      console.log('User is admin, can delete');
+    } else if (artwork.artist_id) {
+      // Check if user is the artist
+      const artistProfile = await ArtistProfile.findOne({ user_id: req.user._id });
+      console.log('Artist profile found:', artistProfile ? artistProfile._id : 'None');
+
+      const userArtistIds = [req.user._id];
+      if (artistProfile) userArtistIds.push(artistProfile._id);
+
+      console.log('userArtistIds:', userArtistIds.map(id => id.toString()));
+      console.log('artwork.artist_id:', artwork.artist_id);
+
+      // Safely handle both populated and non-populated artist_id
+      const artworkArtistId = artwork.artist_id && artwork.artist_id._id 
+        ? artwork.artist_id._id.toString() 
+        : artwork.artist_id ? artwork.artist_id.toString() : null;
+
+      if (artworkArtistId && userArtistIds.some(id => id.toString() === artworkArtistId)) {
+        canDelete = true;
+        console.log('User is the artist, can delete');
+      } else {
+        console.log('User is not the artist, cannot delete');
+      }
+    } else {
+      console.log('Artwork has no artist_id, checking if orphaned artwork');
+      // If artwork has no artist_id, allow deletion for authenticated users (orphaned artwork)
+      canDelete = true;
+    }
+
+    if (!canDelete) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
-    // Get the artist profile to decrement artworks_sold count
-    const artistProfile = await ArtistProfile.findById(artwork.artist_id);
-    if (artistProfile && artistProfile.artworks_sold > 0) {
-      await ArtistProfile.findByIdAndUpdate(artwork.artist_id, {
-        $inc: { artworks_sold: -1 }
-      });
+    // Get the artist profile to decrement artworks_sold count (only if artist_id exists)
+    if (artwork.artist_id) {
+      const artistIdToUse = artwork.artist_id._id ? artwork.artist_id._id : artwork.artist_id;
+      const artistProfile = await ArtistProfile.findById(artistIdToUse);
+      if (artistProfile && artistProfile.artworks_sold > 0) {
+        await ArtistProfile.findByIdAndUpdate(artistIdToUse, {
+          $inc: { artworks_sold: -1 }
+        });
+      }
     }
 
     await Artwork.findByIdAndDelete(req.params.id);
@@ -243,42 +409,109 @@ router.post('/upload', auth, require('../middleware/upload').single('image'), as
   console.log('Body:', req.body);
   console.log('File:', req.file);
 
+  let uploadedFilePath = null;
+
   try {
     // Check if file was uploaded
     if (!req.file) {
       console.log('No file uploaded');
-      return res.status(400).json({ message: 'No image file provided' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'No image file provided' 
+      });
     }
+
+    uploadedFilePath = req.file.path;
 
     // Simple validation
     if (!req.body.title || !req.body.category || !req.body.price) {
       console.log('Validation failed: missing fields');
-      return res.status(400).json({ message: 'Missing required fields: title, category, price' });
+      // Clean up uploaded file
+      await fs.unlink(uploadedFilePath).catch(err => console.error('Error deleting file:', err));
+      return res.status(400).json({ 
+        success: false,
+        message: 'Missing required fields: title, category, price' 
+      });
     }
 
     // Check if user is an artist
     if (req.user.user_type !== 'artist') {
       console.log('User is not an artist');
-      return res.status(403).json({ message: 'Only artists can upload artworks' });
+      // Clean up uploaded file
+      await fs.unlink(uploadedFilePath).catch(err => console.error('Error deleting file:', err));
+      return res.status(403).json({ 
+        success: false,
+        message: 'Only artists can upload artworks' 
+      });
     }
+
+    // === DUPLICATE DETECTION ===
+    console.log('Starting duplicate detection...');
+    
+    // Read file buffer for hashing (buffer preferred if using memory storage)
+    const fileBuffer = req.file.buffer ? req.file.buffer : await fs.readFile(uploadedFilePath);
+    
+    // Generate normalized SHA-256 hash for exact duplicate detection across formats
+    const imageHash = await generateNormalizedSHA256Hash(fileBuffer);
+    console.log('Generated SHA-256 hash:', imageHash);
+    
+    // Generate perceptual hash for similar image detection
+    const perceptualHash = await generatePerceptualHash(fileBuffer);
+    console.log('Generated perceptual hash:', perceptualHash || 'N/A');
 
     const artistProfile = await ArtistProfile.findOne({ user_id: req.user._id });
     console.log('Artist profile found:', artistProfile);
 
-    // Allow upload even if artist profile doesn't exist yet
-    // This handles the case where a new artist registers and tries to upload immediately
     let artistId;
-
-    // If no artist profile exists, create a temporary one or use user ID directly
-    if (!artistProfile) {
-      console.log('No artist profile found, creating temporary reference');
-      // For now, we'll use the user ID as artist_id, but ideally should create artist profile
-      artistId = req.user._id;
-      console.log('Using user ID as artist ID:', artistId);
-    } else {
+    if (artistProfile) {
       artistId = artistProfile._id;
+    } else {
+      // Allow upload even if artist profile doesn't exist yet
+      console.log('No artist profile found, using user ID as artist ID');
+      artistId = req.user._id;
     }
 
+    // Check for exact duplicate by SHA-256 hash
+    const exactDuplicate = await Artwork.findOne({ imageHash }).select('_id title created_at artist_id');
+    if (exactDuplicate) {
+      console.log('Exact duplicate detected:', exactDuplicate._id, 'hash:', imageHash);
+      // Clean up uploaded file
+      await fs.unlink(uploadedFilePath).catch(err => console.error('Error deleting file:', err));
+      
+      return res.status(409).json({
+        success: false,
+        errorType: 'DUPLICATE_IMAGE',
+        message: 'Duplicate or visually similar image detected'
+      });
+    }
+
+    // Check for similar images using perceptual hash (if available)
+    if (perceptualHash) {
+      const similarityThreshold = Number(process.env.IMAGE_SIMILARITY_THRESHOLD || 8);
+      const allArtworks = await Artwork.find({ perceptualHash: { $exists: true, $ne: null } })
+        .select('perceptualHash artist_id')
+        .limit(2000);
+
+      for (const artwork of allArtworks) {
+        if (areSimilarImages(perceptualHash, artwork.perceptualHash, similarityThreshold)) {
+          const isDifferentArtist = artwork.artist_id?.toString() !== artistId?.toString();
+          console.log('Similar image detected:', artwork._id, 'differentArtist:', isDifferentArtist);
+          await fs.unlink(uploadedFilePath).catch(err => console.error('Error deleting file:', err));
+
+          return res.status(409).json({
+            success: false,
+            errorType: 'DUPLICATE_IMAGE',
+            message: isDifferentArtist
+              ? 'This image already exists on the platform'
+              : 'Duplicate or visually similar image detected'
+          });
+        }
+      }
+    }
+
+    console.log('No duplicates found, proceeding with upload...');
+
+    // === PROCEED WITH ARTWORK CREATION ===
     // Construct image URL
     const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
 
@@ -288,6 +521,8 @@ router.post('/upload', auth, require('../middleware/upload').single('image'), as
       category: req.body.category,
       price: parseFloat(req.body.price),
       image_url: imageUrl,
+      imageHash: imageHash,
+      perceptualHash: perceptualHash,
       artist_id: artistId,
       status: 'published'
     });
@@ -309,12 +544,34 @@ router.post('/upload', auth, require('../middleware/upload').single('image'), as
 
     console.log('Artwork saved successfully');
     res.status(201).json({
+      success: true,
       message: 'Artwork uploaded successfully! 🎨',
       artwork: artwork
     });
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ message: 'Failed to upload artwork. Please try again.' });
+    
+    // Clean up uploaded file on error
+    if (uploadedFilePath) {
+      await fs.unlink(uploadedFilePath).catch(err => 
+        console.error('Error deleting file during cleanup:', err)
+      );
+    }
+
+    // Handle specific MongoDB duplicate key error
+    if (error.code === 11000 && (error.keyPattern?.imageHash || error.keyValue?.imageHash)) {
+      return res.status(409).json({
+        success: false,
+        errorType: 'DUPLICATE_IMAGE',
+        message: 'Duplicate or visually similar image detected'
+      });
+    }
+
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to upload artwork. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

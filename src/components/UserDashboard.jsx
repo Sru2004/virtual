@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
-import { ShoppingCart } from 'lucide-react';
+
 
 export default function UserDashboard() {
   const { user, profile } = useAuth();
@@ -18,17 +18,18 @@ export default function UserDashboard() {
   const [ratingFilter, setRatingFilter] = useState("");
 
   const [loading, setLoading] = useState(true);
-  const [cartCount, setCartCount] = useState(0);
-
   // Fetch all artworks from API and cart count
   useEffect(() => {
     const fetchArtworks = async () => {
       try {
         const artworksRes = await api.getArtworks({ status: 'published' });
-        setArtworks(artworksRes || []);
-        setFiltered(artworksRes || []);
+        const artworksArray = Array.isArray(artworksRes) ? artworksRes : [];
+        setArtworks(artworksArray);
+        setFiltered(artworksArray);
       } catch (error) {
         console.error('Error fetching artworks:', error);
+        setArtworks([]);
+        setFiltered([]);
       } finally {
         setLoading(false);
       }
@@ -45,20 +46,8 @@ export default function UserDashboard() {
       }
     };
 
-    const updateCartCount = () => {
-      const savedCart = localStorage.getItem('cartItems');
-      if (savedCart) {
-        const cartItems = JSON.parse(savedCart);
-        const count = Object.values(cartItems).reduce((total, qty) => total + qty, 0);
-        setCartCount(count);
-      } else {
-        setCartCount(0);
-      }
-    };
-
     fetchArtworks();
     fetchWishlist();
-    updateCartCount();
 
     // Set up real-time updates every 30 seconds
     const interval = setInterval(fetchArtworks, 30000);
@@ -68,24 +57,17 @@ export default function UserDashboard() {
       fetchArtworks();
     };
 
-    // Listen for cart changes
-    const handleStorageChange = () => {
-      updateCartCount();
-    };
-
     // Listen for wishlist updates
     const handleWishlistUpdate = () => {
       fetchWishlist();
     };
 
     window.addEventListener('artworkUploaded', handleArtworkUploaded);
-    window.addEventListener('storage', handleStorageChange);
     window.addEventListener('wishlistUpdated', handleWishlistUpdate);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('artworkUploaded', handleArtworkUploaded);
-      window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
     };
   }, []);
@@ -117,27 +99,13 @@ export default function UserDashboard() {
 
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
-      {/* User Name and Cart */}
+      {/* User Name */}
       <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">
-              Welcome, {profile?.full_name || "User"}
-            </h1>
-            <p className="text-gray-600">Explore amazing artworks from talented artists.</p>
-          </div>
-          <button
-            onClick={() => navigate('/cart')}
-            className="relative flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            <ShoppingCart className="h-5 w-5" />
-            <span>Cart</span>
-            {cartCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                {cartCount}
-              </span>
-            )}
-          </button>
+        <div>
+          <h1 className="text-2xl font-semibold">
+            Welcome, {profile?.full_name || "User"}
+          </h1>
+          <p className="text-gray-600">Explore amazing artworks from talented artists.</p>
         </div>
       </div>
 

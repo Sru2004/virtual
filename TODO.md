@@ -1,19 +1,19 @@
-# Admin Functionality Fixes
+# TODO: Fix Logout Redirect Behavior
 
-## High Priority
-- [ ] Add authentication guard for admin routes in App.jsx
-- [ ] Fix AdminDashboard white page issue
-- [ ] Add missing API methods (updateUser, etc.)
-- [ ] Fix backend Order model inconsistencies
-- [ ] Improve error handling in admin components
+## Current Issue
+- When logging out, the app always redirects to `/login` regardless of user type (artist or buyer/user).
+- The user wants artists to be redirected to the login page and buyers (users) to the home page upon logout.
+- Currently, logout doesn't properly clear state in some cases, causing unexpected redirects.
 
-## Medium Priority
-- [ ] Test all admin functionalities
-- [ ] Ensure proper data loading states
-- [ ] Fix chart rendering issues
-- [ ] Add proper admin navigation
+## Plan
+1. Modify `Navbar.jsx` handleLogout function to:
+   - Capture the user type before calling logout.
+   - After logout, redirect based on user type: artists to `/login`, users to `/`.
+2. Ensure `AuthContext.jsx` logout function properly clears all authentication state.
+3. Test that protected routes still work correctly after logout.
 
-## Low Priority
-- [ ] Optimize admin dashboard performance
-- [ ] Add admin notifications
-- [ ] Improve admin UI/UX
+## Steps
+- [x] Update handleLogout in Navbar.jsx to conditionally redirect based on user type.
+- [x] Verify logout clears token and state properly in AuthContext.
+- [x] Test logout for both artist and user accounts.
+- [x] Modified ProtectedUserRoute and ProtectedArtistRoute to prevent premature redirects.

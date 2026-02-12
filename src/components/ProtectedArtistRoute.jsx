@@ -20,12 +20,7 @@ const ProtectedArtistRoute = ({ children }) => {
     );
   }
 
-  if (!profile) {
-    console.log('ProtectedArtistRoute: No profile, redirecting to login');
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  if (profile.user_type !== 'artist') {
+  if (profile && profile.user_type !== 'artist') {
     console.log('ProtectedArtistRoute: Not an artist, redirecting to home');
     return <Navigate to="/" replace />;
   }

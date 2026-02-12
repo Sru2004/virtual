@@ -25,6 +25,16 @@ const artworkSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  imageHash: {
+    type: String,
+    required: true,
+    unique: true,
+    index: true
+  },
+  perceptualHash: {
+    type: String,
+    index: true
+  },
   tags: [String],
   size: {
     type: String,
@@ -51,6 +61,17 @@ const artworkSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
+});
+
+// Indexes for efficient duplicate detection
+artworkSchema.index({ imageHash: 1 }, { unique: true });
+artworkSchema.index({ perceptualHash: 1 });
+artworkSchema.index({ artist_id: 1, created_at: -1 });
+
+// Update timestamp on save
+artworkSchema.pre('save', function(next) {
+  this.updated_at = Date.now();
+  next();
 });
 
 module.exports = mongoose.model('Artwork', artworkSchema);

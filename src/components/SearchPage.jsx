@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import { Search, Star, ShoppingCart } from 'lucide-react';
+import { toastSuccess, toastError } from '../lib/toast';
 
 export default function SearchPage() {
   const { profile } = useAuth();
@@ -47,10 +48,10 @@ export default function SearchPage() {
       currentCart[artwork._id] = newQuantity;
       localStorage.setItem('cartItems', JSON.stringify(currentCart));
       window.dispatchEvent(new Event('storage'));
-      alert(`Added "${artwork.title}" to cart!`);
+      toastSuccess(`Added "${artwork.title}" to cart!`);
     } catch (error) {
       console.error('Error adding to cart:', error);
-      alert('Failed to add item to cart. Please try again.');
+      toastError('Failed to add item to cart. Please try again.');
     }
   };
 

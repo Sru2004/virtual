@@ -7,6 +7,39 @@ const { auth } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Get all reviews (for artists to see their reviews)
+router.get('/', auth, async (req, res) => {
+  try {
+    let query = {};
+
+    // If artist, only return reviews for their artworks
+    if (req.user.user_type === 'artist') {
+      const artistProfile = await ArtistProfile.findOne({ user_id: req.user._id });
+      if (artistProfile) {
+        query.artist_id = artistProfile._id;
+      } else {
+        // If no artist profile found, return empty array
+        return res.json({ success: true, reviews: [] });
+      }
+    } else if (req.user.user_type !== 'admin') {
+      // Regular users can only see their own reviews
+      query.user_id = req.user._id;
+    }
+    // Admin can see all reviews (no filter)
+
+    const reviews = await Review.find(query)
+      .populate('user_id', 'full_name')
+      .populate('artwork_id', 'title image_url')
+      .populate('artist_id', 'artist_name')
+      .sort({ created_at: -1 });
+    
+    res.json({ success: true, reviews });
+  } catch (error) {
+    console.error('Error fetching reviews:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Get reviews for an artwork
 router.get('/artwork/:artworkId', auth, async (req, res) => {
   try {
