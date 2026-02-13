@@ -10,14 +10,17 @@ import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import { api } from "../lib/api";
 import { toastSuccess } from "../lib/toast";
+// eslint-disable-next-line no-unused-vars
+import { ArrowLeft, ShoppingCart, ZoomIn, ZoomOut, Move, X } from "lucide-react";
 
 // eslint-disable-next-line no-unused-vars
-const ARArtwork = ({ imageUrl, onClose, onAddToCart }) => {
+const ARArtwork = ({ imageUrl, onClose, onAddToCart, onBuyNow, onBack }) => {
   const [texture, setTexture] = useState(null);
   const [placed, setPlaced] = useState(false);
   const [position, setPosition] = useState([0, 0, -1]);
   const [rotation, setRotation] = useState([0, 0, 0]);
   const [geometry, setGeometry] = useState([1.5, 1.5]);
+  const [scale, setScale] = useState(1);
 
   useEffect(() => {
     const loader = new THREE.TextureLoader();
@@ -67,6 +70,30 @@ const ARArtwork = ({ imageUrl, onClose, onAddToCart }) => {
     }
   };
 
+  const handleZoomIn = () => {
+    setScale((prev) => Math.min(prev + 0.1, 2));
+  };
+
+  const handleZoomOut = () => {
+    setScale((prev) => Math.max(prev - 0.1, 0.3));
+  };
+
+  const handleMoveUp = () => {
+    setPosition(([x, y, z]) => [x, y + 0.05, z]);
+  };
+
+  const handleMoveDown = () => {
+    setPosition(([x, y, z]) => [x, y - 0.05, z]);
+  };
+
+  const handleMoveLeft = () => {
+    setPosition(([x, y, z]) => [x - 0.05, y, z]);
+  };
+
+  const handleMoveRight = () => {
+    setPosition(([x, y, z]) => [x + 0.05, y, z]);
+  };
+
   if (!texture) {
     return (
       <Html position={[0, 0, -2]} center>
@@ -85,7 +112,7 @@ const ARArtwork = ({ imageUrl, onClose, onAddToCart }) => {
         <mesh
           position={position}
           rotation={rotation}
-          scale={[1, 1, 1]}
+          scale={[scale, scale, scale]}
           onClick={handleTap}
         >
           <planeGeometry args={geometry} />
@@ -101,33 +128,124 @@ const ARArtwork = ({ imageUrl, onClose, onAddToCart }) => {
         </mesh>
       )}
 
-      {/* UI */}
-      <Html center position={[0, 1, -2]}>
-        <div className="flex flex-col gap-2">
-          {placed && (
+      {/* UI - Only show after placement */}
+      {placed && (
+        <Html center position={[0, 1, -2]}>
+          <div className="flex flex-col gap-3 min-w-[200px]">
+            {/* Scale Controls */}
+            <div className="bg-black/70 p-3 rounded-lg">
+              <p className="text-white text-xs text-center mb-2">Resize</p>
+              <div className="flex gap-2 justify-center">
+                <button
+                  onClick={handleZoomOut}
+                  className="bg-gray-600 text-white p-2 rounded hover:bg-gray-500"
+                  title="Zoom Out"
+                >
+                  <ZoomOut size={20} />
+                </button>
+                <span className="text-white flex items-center px-2">{Math.round(scale * 100)}%</span>
+                <button
+                  onClick={handleZoomIn}
+                  className="bg-gray-600 text-white p-2 rounded hover:bg-gray-500"
+                  title="Zoom In"
+                >
+                  <ZoomIn size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Position Controls */}
+            <div className="bg-black/70 p-3 rounded-lg">
+              <p className="text-white text-xs text-center mb-2">Move Position</p>
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-center gap-2">
+                  <button
+                    onClick={handleMoveUp}
+                    className="bg-gray-600 text-white p-2 rounded hover:bg-gray-500"
+                    title="Move Up"
+                  >
+                    <Move size={20} className="rotate-180" />
+                  </button>
+                </div>
+                <div className="flex justify-center gap-2">
+                  <button
+                    onClick={handleMoveLeft}
+                    className="bg-gray-600 text-white p-2 rounded hover:bg-gray-500"
+                    title="Move Left"
+                  >
+                    <Move size={20} className="-rotate-90" />
+                  </button>
+                  <button
+                    onClick={handleMoveDown}
+                    className="bg-gray-600 text-white p-2 rounded hover:bg-gray-500"
+                    title="Move Down"
+                  >
+                    <Move size={20} />
+                  </button>
+                  <button
+                    onClick={handleMoveRight}
+                    className="bg-gray-600 text-white p-2 rounded hover:bg-gray-500"
+                    title="Move Right"
+                  >
+                    <Move size={20} className="rotate-90" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Reposition Button */}
             <button
               onClick={() => setPlaced(false)}
-              className="bg-blue-600 text-white px-3 py-2 rounded"
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center justify-center gap-2"
             >
+              <Move size={18} />
               Reposition
             </button>
-          )}
 
-          <button
-            onClick={onAddToCart}
-            className="bg-green-600 text-white px-3 py-2 rounded"
-          >
-            Add to Cart
-          </button>
+            {/* Decision Buttons */}
+            <button
+              onClick={onBuyNow}
+              className="bg-green-600 text-white px-4 py-3 rounded hover:bg-green-700 flex items-center justify-center gap-2 font-semibold"
+            >
+              <ShoppingCart size={18} />
+              Buy Now
+            </button>
 
-          <button
-            onClick={onClose}
-            className="bg-red-600 text-white px-3 py-2 rounded"
-          >
-            Close AR
-          </button>
-        </div>
-      </Html>
+            <button
+              onClick={onAddToCart}
+              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 flex items-center justify-center gap-2"
+            >
+              Add to Cart
+            </button>
+
+            <button
+              onClick={onBack}
+              className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 flex items-center justify-center gap-2"
+            >
+              <ArrowLeft size={18} />
+              Back
+            </button>
+
+            <button
+              onClick={onClose}
+              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 flex items-center justify-center gap-2"
+            >
+              <X size={18} />
+              Close AR
+            </button>
+          </div>
+        </Html>
+      )}
+
+      {/* Instructions before placement */}
+      {!placed && (
+        <Html center position={[0, 1.5, -2]}>
+          <div className="bg-black/70 text-white px-6 py-4 rounded-lg text-center">
+            <p className="text-lg font-semibold mb-2">Point your camera at a wall</p>
+            <p className="text-sm opacity-75">Tap the screen to place the artwork</p>
+          </div>
+        </Html>
+      )}
     </>
   );
 };
@@ -174,7 +292,19 @@ const ARView = () => {
     localStorage.setItem("cartItems", JSON.stringify(cart));
     window.dispatchEvent(new Event("storage"));
     toastSuccess(`Added "${artwork.title}" to cart!`);
+  };
+
+  const handleBuyNow = () => {
+    const cart = JSON.parse(localStorage.getItem("cartItems") || "{}");
+    cart[artwork._id] = (cart[artwork._id] || 0) + 1;
+    localStorage.setItem("cartItems", JSON.stringify(cart));
+    window.dispatchEvent(new Event("storage"));
+    toastSuccess(`Added "${artwork.title}" to cart!`);
     navigate("/cart");
+  };
+
+  const handleBack = () => {
+    navigate(`/artwork-details/${id}`);
   };
 
   if (loading) {
@@ -224,6 +354,8 @@ const ARView = () => {
                 imageUrl={artwork.image_url}
                 onClose={() => setStartAR(false)}
                 onAddToCart={handleAddToCart}
+                onBuyNow={handleBuyNow}
+                onBack={handleBack}
               />
             </Suspense>
           </XR>

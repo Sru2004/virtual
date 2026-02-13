@@ -12,7 +12,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5177', 'http://localhost:5178', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5177', 'http://127.0.0.1:5178', 'http://10.67.109.231:5174'],
+  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5177', 'http://localhost:5178', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:5177', 'http://127.0.0.1:5178', 'http://10.67.109.231:5174', 'https://new-sigma-lime-91.vercel.app'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -29,7 +29,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 
 // Connect to MongoDB (use MONGODB_URI when provided)
-const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://truptikandalkar0:Radha3992@cluster0.low5vpa.mongodb.net/?appName=Cluster0';
+const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://srujana:Srujana123@cluster0.37lwfdw.mongodb.net/?appName=Cluster0';
 mongoose.connect(mongoUri, {
   serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
   socketTimeoutMS: 45000, // Close sockets after 45s of inactivity

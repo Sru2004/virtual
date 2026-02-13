@@ -1,15 +1,12 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
-import { Star, Heart, ShoppingCart, ArrowLeft, MapPin, Calendar, Award, User, Eye } from 'lucide-react';
 import { toastSuccess, toastError } from '../lib/toast';
 
-const ArtworkDetails = ({ onBack }) => {
+const ArtworkDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const artworkId = id;
-  const { profile } = useAuth();
   const [artwork, setArtwork] = useState(null);
   const [artist, setArtist] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,49 +16,94 @@ const ArtworkDetails = ({ onBack }) => {
 
 
   useEffect(() => {
+    // Create AbortController for cleanup
+    const controller = new AbortController();
+    
     if (artworkId) {
-      fetchArtworkDetails();
-      checkWishlistStatus();
+      fetchArtworkDetails(controller.signal);
+      checkWishlistStatus(controller.signal);
     }
+
+    // Cleanup function to prevent memory leaks and state updates on unmount
+    return () => {
+      controller.abort();
+    };
   }, [artworkId]);
 
-  const checkWishlistStatus = async () => {
+  const checkWishlistStatus = async (signal) => {
     try {
-      const wishlistData = await api.getWishlist();
-      const isInWishlist = wishlistData.some(item => item.artwork_id === artworkId);
-      setIsWishlisted(isInWishlist);
+      const isInWishlist = await api.checkWishlist(artworkId);
+      // Check if component is still mounted before setting state
+      if (!signal.aborted) {
+        setIsWishlisted(isInWishlist);
+      }
     } catch (error) {
-      console.error('Error checking wishlist status:', error);
+      // Ignore abort errors
+      if (error.name !== 'AbortError' && !signal.aborted) {
+        console.error('Error checking wishlist status:', error);
+      }
     }
   };
 
-  const fetchArtworkDetails = async () => {
+  const fetchArtworkDetails = async (signal) => {
     try {
       setLoading(true);
+      setError(null);
+      
       const artworkData = await api.getArtwork(artworkId);
+      
+      // Check if component is still mounted before setting state
+      if (signal.aborted) return;
+      
       setArtwork(artworkData);
 
       // Fetch artist profile if artwork has artist_id
       if (artworkData.artist_id) {
         try {
-          const artistData = await api.getArtistProfile(artworkData.artist_id._id || artworkData.artist_id);
-          setArtist(artistData);
+          const artistId = artworkData.artist_id._id || artworkData.artist_id;
+          if (artistId) {
+            const artistData = await api.getArtistProfile(artistId);
+            if (!signal.aborted) {
+              setArtist(artistData);
+            }
+          }
         } catch (error) {
-          console.error('Error fetching artist profile:', error);
+          // Ignore abort errors
+          if (error.name !== 'AbortError' && !signal.aborted) {
+            console.error('Error fetching artist profile:', error);
+          }
         }
       }
 
       // Fetch related artworks
-      const allArtworks = await api.getArtworks({ status: 'published' });
-      const related = allArtworks
-        .filter(art => art.category === artworkData.category && art._id !== artworkData._id)
-        .slice(0, 4);
-      setRelatedArtworks(related);
+      try {
+        const allArtworks = await api.getArtworks({ status: 'published' });
+        if (!signal.aborted) {
+          const related = allArtworks
+            .filter(art => art.category === artworkData.category && art._id !== artworkData._id)
+            .slice(0, 4);
+          setRelatedArtworks(related);
+        }
+      } catch (error) {
+        // Ignore abort errors for related artworks
+        if (error.name !== 'AbortError' && !signal.aborted) {
+          console.error('Error fetching related artworks:', error);
+        }
+      }
 
     } catch (error) {
+      // Check if error is due to abort (component unmounted)
+      if (error.name === 'AbortError' || signal.aborted) {
+        return;
+      }
+      
       console.error('Error fetching artwork details:', error);
+      setError(error.message || 'Failed to load artwork details. Please try again.');
     } finally {
-      setLoading(false);
+      // Only update loading state if not aborted
+      if (!signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
@@ -95,14 +137,17 @@ const ArtworkDetails = ({ onBack }) => {
       if (isWishlisted) {
         await api.removeFromWishlist(artwork._id);
         setIsWishlisted(false);
+        toastSuccess(`Removed "${artwork.title}" from wishlist`);
       } else {
         await api.addToWishlist(artwork._id);
         setIsWishlisted(true);
+        toastSuccess(`Added "${artwork.title}" to wishlist`);
       }
       // Dispatch custom event to refresh wishlist in other components
       window.dispatchEvent(new CustomEvent('wishlistUpdated'));
     } catch (error) {
       console.error('Error updating wishlist:', error);
+      toastError('Failed to update wishlist. Please try again.');
     }
   };
 
@@ -192,7 +237,7 @@ const ArtworkDetails = ({ onBack }) => {
                   artwork.status === 'sold' ? 'bg-red-100 text-red-700' :
                   'bg-yellow-100 text-yellow-700'
                 }`}>
-                  {artwork.status}
+                  {artwork.status ? artwork.status.charAt(0).toUpperCase() + artwork.status.slice(1) : 'Unknown'}
                 </span>
               </div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{artwork.title}</h1>
@@ -282,7 +327,7 @@ const ArtworkDetails = ({ onBack }) => {
                 className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
               >
                 <Eye className="h-5 w-5" />
-                View in AR
+                AR Preview
               </button>
               <div className="flex gap-4">
                 <button

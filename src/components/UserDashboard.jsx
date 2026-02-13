@@ -1,18 +1,17 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 
 
 export default function UserDashboard() {
-  const { user, profile } = useAuth();
+  const { profile } = useAuth();
   const navigate = useNavigate();
 
   const [artworks, setArtworks] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [wishlist, setWishlist] = useState([]);
 
-  const [categoryFilter, setCategoryFilter] = useState("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [ratingFilter, setRatingFilter] = useState("");
@@ -76,10 +75,6 @@ export default function UserDashboard() {
   useEffect(() => {
     let items = artworks;
 
-    if (categoryFilter) {
-      items = items.filter((a) => a.category?.toLowerCase() === categoryFilter.toLowerCase());
-    }
-
     if (minPrice) {
       items = items.filter((a) => Number(a.price) >= Number(minPrice));
     }
@@ -93,7 +88,7 @@ export default function UserDashboard() {
     }
 
     setFiltered(items);
-  }, [categoryFilter, minPrice, maxPrice, ratingFilter, artworks]);
+  }, [minPrice, maxPrice, ratingFilter, artworks]);
 
   if (loading) return <p className="text-center mt-10">Loading...</p>;
 
@@ -113,21 +108,6 @@ export default function UserDashboard() {
         {/* Left Sidebar Filters */}
         <div className="bg-white p-4 rounded-xl shadow-sm">
           <h3 className="font-semibold text-lg mb-3">Filters</h3>
-
-          <label className="text-sm block mb-2">Category</label>
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="w-full border p-2 rounded mb-3"
-          >
-            <option value="">All Categories</option>
-            <option value="abstract">Abstract</option>
-            <option value="landscapes">Landscapes</option>
-            <option value="portraits">Portraits</option>
-            <option value="mixed media">Mixed Media</option>
-            <option value="digital">Digital</option>
-            <option value="sculpture">Sculpture</option>
-          </select>
 
           <label className="text-sm block mb-2">Price Range</label>
           <input
@@ -209,13 +189,13 @@ export default function UserDashboard() {
                       </button>
                       <button
                         className={`px-3 py-2 rounded-lg text-sm font-medium ${
-                          wishlist.some(item => item.artwork_id === art._id)
+                          wishlist.some(item => String(item.artwork_id._id) === String(art._id))
                             ? 'bg-red-500 text-white hover:bg-red-600'
                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                         }`}
                         onClick={async () => {
                           try {
-                            const isInWishlist = wishlist.some(item => item.artwork_id === art._id);
+                            const isInWishlist = wishlist.some(item => String(item.artwork_id._id) === String(art._id));
                             if (isInWishlist) {
                               await api.removeFromWishlist(art._id);
                             } else {
@@ -230,7 +210,7 @@ export default function UserDashboard() {
                           }
                         }}
                       >
-                        {wishlist.some(item => item.artwork_id === art._id) ? '❤️' : '🤍'}
+                        {wishlist.some(item => String(item.artwork_id._id) === String(art._id)) ? '❤️' : '🤍'}
                       </button>
                     </div>
                   </div>

@@ -97,7 +97,21 @@ router.post('/', auth, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
-    // Note: ObjectId conversion is not needed as we're storing string IDs directly
+    // Convert userId string to MongoDB ObjectId
+    let userIdObjectId;
+    try {
+      userIdObjectId = new mongoose.Types.ObjectId(userId);
+    } catch (error) {
+      return res.status(400).json({ success: false, message: 'Invalid userId format' });
+    }
+
+    // Convert address string to MongoDB ObjectId
+    let addressObjectId;
+    try {
+      addressObjectId = new mongoose.Types.ObjectId(address);
+    } catch (error) {
+      return res.status(400).json({ success: false, message: 'Invalid address format' });
+    }
 
     let totalAmount = 0;
     const orderItems = [];
@@ -126,10 +140,10 @@ router.post('/', auth, async (req, res) => {
     totalAmount += Math.round(totalAmount * 2 / 100);
 
     const order = new Order({
-      user_id: userId,
+      user_id: userIdObjectId,
       items: orderItems,
       total_amount: totalAmount,
-      address: address,
+      address: addressObjectId,
       paymentType: paymentMethod ? 'Online' : 'COD'
     });
 

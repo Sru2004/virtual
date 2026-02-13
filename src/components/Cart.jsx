@@ -30,7 +30,7 @@ const Cart = () => {
     const getCart = useCallback(() => {
         let tempArray = [];
         for (const key in cartItems) {
-            const artwork = artworks.find((item) => item._id === key);
+            const artwork = artworks.find((item) => String(item._id) === String(key));
             if (artwork) {
                 artwork.quantity = cartItems[key];
                 tempArray.push(artwork);
@@ -278,8 +278,8 @@ const Cart = () => {
                                         <p>Qty:</p>
                                         <select onChange={e => updateCartItem(artwork._id, Number(e.target.value))}
                                             value={cartItems[artwork._id]} className='outline-none'>
-                                            {Array((cartItems[artwork._id] > 10 ? cartItems[artwork._id] : 10)).fill('').map((_, index) => (
-                                                <option key={index} value={index + 1}>{index + 1}</option>
+                                            {Array.from({length: 10}, (_, i) => i + 1).map((num) => (
+                                                <option key={num} value={num}>{num}</option>
                                             ))}
                                         </select>
                                     </div>
