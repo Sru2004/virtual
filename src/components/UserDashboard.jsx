@@ -144,9 +144,18 @@ export default function UserDashboard() {
           <h2 className="text-xl font-semibold mb-4">Artworks</h2>
 
           {filtered.length === 0 ? (
-            <p className="text-gray-500 bg-white p-5 rounded-xl shadow-sm">
-              No artworks match your filters.
-            </p>
+            <div className="bg-white p-8 rounded-xl shadow-sm text-center">
+              <p className="text-gray-600 text-lg mb-2">
+                {artworks.length === 0
+                  ? 'No artworks available yet.'
+                  : 'No artworks match your filters.'}
+              </p>
+              {artworks.length === 0 && (
+                <p className="text-gray-500 text-sm">
+                  Artists can add artworks from their dashboard; admins can approve them. Or run <code className="bg-gray-100 px-1 rounded">npm run seed</code> in the backend folder to add sample artworks.
+                </p>
+              )}
+            </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {filtered.map((art) => (

@@ -1,10 +1,15 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { body, validationResult } = require('express-validator');
+const { body, validationResult, matchedData } = require('express-validator');
 const User = require('../models/User');
 const ArtistProfile = require('../models/ArtistProfile');
 const { auth } = require('../middleware/auth');
+
+const findByEmailCaseInsensitive = (email) => {
+  const escaped = String(email || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return User.findOne({ email: new RegExp(`^${escaped}$`, 'i') });
+};
 
 const router = express.Router();
 
@@ -22,9 +27,10 @@ router.post('/register', [
     }
 
     const { email, password, full_name, user_type, phone, profile_picture, address, artist_name, bio, portfolio_link } = req.body;
+    const emailLower = (email || '').toLowerCase().trim();
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    // Check if user already exists (case-insensitive)
+    const existingUser = await findByEmailCaseInsensitive(email);
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
     }
@@ -32,9 +38,9 @@ router.post('/register', [
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user
+    // Create user (store email lowercase for consistent lookup)
     const user = new User({
-      email,
+      email: emailLower,
       password: hashedPassword,
       full_name,
       user_type,
@@ -59,16 +65,16 @@ router.post('/register', [
     // Generate JWT
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '30d' });
 
-    res.status(201).json({ token, user: { id: user._id, email, full_name, user_type } });
+    res.status(201).json({ token, user: { id: user._id, email: user.email, full_name, user_type } });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-// Login
+// Login (artist and user share same endpoint)
 router.post('/login', [
   body('email').isEmail().normalizeEmail(),
-  body('password').exists()
+  body('password').exists().trim()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -76,21 +82,22 @@ router.post('/login', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { email, password } = req.body;
+    const { email, password } = matchedData(req);
 
-    const user = await User.findOne({ email });
+    const user = await findByEmailCaseInsensitive(email);
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const passwordTrimmed = (password || '').trim();
+    const isMatch = await bcrypt.compare(passwordTrimmed, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '30d' });
 
-    res.json({ success: true, token, user: { id: user._id, email, full_name: user.full_name, user_type: user.user_type } });
+    res.json({ success: true, token, user: { id: user._id, email: user.email, full_name: user.full_name, user_type: user.user_type } });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { ArrowLeft, Star, Eye, ShoppingCart, Heart, MapPin, Calendar, Award } from "lucide-react";
 import { api } from '../lib/api';
 import { toastSuccess, toastError } from '../lib/toast';
 

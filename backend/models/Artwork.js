@@ -45,6 +45,11 @@ const artworkSchema = new mongoose.Schema({
     enum: ['pending', 'published', 'sold'],
     default: 'pending'
   },
+  /** When true, artwork is seed/demo data and is hidden from public listing (only artist-uploaded show). */
+  is_demo: {
+    type: Boolean,
+    default: false
+  },
   likes_count: {
     type: Number,
     default: 0
@@ -67,6 +72,13 @@ const artworkSchema = new mongoose.Schema({
 artworkSchema.index({ imageHash: 1 }, { unique: true });
 artworkSchema.index({ perceptualHash: 1 });
 artworkSchema.index({ artist_id: 1, created_at: -1 });
+
+// Expose id for API consumers (same as _id)
+artworkSchema.virtual('id').get(function () {
+  return this._id?.toString();
+});
+artworkSchema.set('toJSON', { virtuals: true });
+artworkSchema.set('toObject', { virtuals: true });
 
 // Update timestamp on save
 artworkSchema.pre('save', function(next) {

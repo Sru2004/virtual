@@ -1,6 +1,8 @@
 
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// Use relative URL in development (Vite proxy will handle it)
+// Use absolute URL in production (set VITE_API_URL in environment)
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 class ApiClient {
   constructor() {
@@ -28,18 +30,30 @@ class ApiClient {
       headers.Authorization = `Bearer ${this.token}`;
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-      cache: 'no-cache',
-    });
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        cache: 'no-cache',
+      });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'An error occurred' }));
-      throw new Error(error.message || `HTTP ${response.status}`);
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'An error occurred' }));
+        throw new Error(error.message || `HTTP ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      // Provide more helpful error messages
+      if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+        // Check if it's a network error or CORS error
+        throw new Error(`Unable to connect to server. Please check if the backend is running and the API URL is correct. API: ${API_BASE_URL}`);
+      }
+      if (error.message.includes('CORS')) {
+        throw new Error('Cross-origin request blocked. Please contact the administrator.');
+      }
+      throw error;
     }
-
-    return response.json();
   }
 
   // Auth endpoints

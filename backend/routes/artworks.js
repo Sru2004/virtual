@@ -6,7 +6,7 @@ const https = require('https');
 const path = require('path');
 const Artwork = require('../models/Artwork');
 const ArtistProfile = require('../models/ArtistProfile');
-const { auth } = require('../middleware/auth');
+const { auth, optionalAuth } = require('../middleware/auth');
 const { generateNormalizedSHA256Hash, generatePerceptualHash, areSimilarImages } = require('../utils/imageHash');
 
 const router = express.Router();
@@ -60,34 +60,42 @@ const downloadImageBuffer = (imageUrl, redirectCount = 0) => new Promise((resolv
   }
 });
 
-// Get all artworks (published or own)
-router.get('/', auth, async (req, res) => {
+// Get all artworks (public: published only; authenticated: published + own, admin: all)
+router.get('/', optionalAuth, async (req, res) => {
   try {
     const { status, category, artist_id } = req.query;
     let query = {};
 
+    // No token or invalid token: only published artworks (public gallery); exclude seed/demo
+    if (!req.user) {
+      query.status = 'published';
+      query.is_demo = { $ne: true };
+      if (category) query.category = category;
+      if (artist_id) query.artist_id = artist_id;
+      const artworks = await Artwork.find(query).populate('artist_id', 'full_name');
+      return res.json(artworks);
+    }
+
     if (status) query.status = status;
     if (category) query.category = category;
+    // Only show artist-uploaded artworks (exclude seed/demo)
+    query.is_demo = { $ne: true };
 
     // If not admin, only show published artworks or own artworks
     if (req.user.user_type !== 'admin') {
       if (artist_id) {
-        // If specific artist_id requested, check if it's the user's own
         const artistProfile = await ArtistProfile.findOne({ user_id: req.user._id });
         const isOwnArtist = req.user._id.toString() === artist_id || (artistProfile && artistProfile._id.toString() === artist_id);
 
         if (isOwnArtist) {
-          // Show own artworks, all statuses - include both user_id and artist_profile_id if exists
           const artistIds = [req.user._id];
           if (artistProfile) artistIds.push(artistProfile._id);
           query.artist_id = { $in: artistIds };
         } else {
-          // Show only published artworks of that artist
           query.artist_id = artist_id;
           query.status = 'published';
         }
       } else {
-        // No specific artist, show published or own
         const artistProfile = await ArtistProfile.findOne({ user_id: req.user._id });
         if (artistProfile) {
           query.$or = [
@@ -103,7 +111,6 @@ router.get('/', auth, async (req, res) => {
         }
       }
     } else {
-      // Admin can see all
       if (artist_id) {
         query.$or = [
           { artist_id: artist_id },
@@ -112,9 +119,7 @@ router.get('/', auth, async (req, res) => {
       }
     }
 
-    console.log('Artwork query:', query);
     const artworks = await Artwork.find(query).populate('artist_id', 'full_name');
-    console.log('Found artworks:', artworks.length);
     res.json(artworks);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -151,11 +156,16 @@ router.get('/my-artworks', auth, async (req, res) => {
   }
 });
 
-// Get artwork by ID
-router.get('/:id', auth, async (req, res) => {
+// Get artwork by ID (optional auth: published artworks viewable by anyone)
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const artwork = await Artwork.findById(req.params.id).populate('artist_id', 'full_name');
     if (!artwork) {
+      return res.status(404).json({ message: 'Artwork not found' });
+    }
+
+    // Skip demo/seed artworks from public
+    if (artwork.is_demo) {
       return res.status(404).json({ message: 'Artwork not found' });
     }
 
@@ -163,14 +173,15 @@ router.get('/:id', auth, async (req, res) => {
     let canView = false;
     if (artwork.status === 'published') {
       canView = true;
-    } else if (req.user.user_type === 'admin') {
+    } else if (req.user && req.user.user_type === 'admin') {
       canView = true;
-    } else {
-      // Check if user is the artist
+    } else if (req.user) {
+      // Check if logged-in user is the artist
+      const artistId = artwork.artist_id?._id || artwork.artist_id;
       const artistProfile = await ArtistProfile.findOne({ user_id: req.user._id });
       const userArtistIds = [req.user._id];
       if (artistProfile) userArtistIds.push(artistProfile._id);
-      if (userArtistIds.some(id => id.toString() === artwork.artist_id._id.toString())) {
+      if (artistId && userArtistIds.some(id => id.toString() === artistId.toString())) {
         canView = true;
       }
     }
@@ -256,7 +267,8 @@ router.post('/', auth, [
       ...req.body,
       artist_id: artistId,
       imageHash,
-      perceptualHash
+      perceptualHash,
+      is_demo: false
     });
 
     await artwork.save();
@@ -524,7 +536,8 @@ router.post('/upload', auth, require('../middleware/upload').single('image'), as
       imageHash: imageHash,
       perceptualHash: perceptualHash,
       artist_id: artistId,
-      status: 'published'
+      status: 'published',
+      is_demo: false
     });
 
     console.log('Saving artwork:', artwork);

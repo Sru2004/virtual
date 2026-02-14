@@ -65,7 +65,7 @@ const Artworks = () => {
   };
 
   const handleDeleteArtwork = async (artworkId) => {
-    const artwork = artworks.find(a => a.id === artworkId);
+    const artwork = artworks.find(a => (a._id || a.id) === artworkId);
     setDeleteModal({
       isOpen: true,
       artworkId: artworkId,
@@ -160,7 +160,7 @@ const Artworks = () => {
       {/* GRID */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {filteredArtworks.map((artwork) => (
-          <div key={artwork.id} className="bg-white rounded-lg shadow border">
+          <div key={artwork._id || artwork.id} className="bg-white rounded-lg shadow border">
             <img
               src={artwork.image_url}
               alt={artwork.title}
@@ -193,13 +193,13 @@ const Artworks = () => {
                 {artwork.status === 'pending' && (
                   <>
                     <button
-                      onClick={() => handleApproveArtwork(artwork.id)}
+                      onClick={() => handleApproveArtwork(artwork._id || artwork.id)}
                       className="flex-1 bg-green-600 text-white py-1 rounded"
                     >
                       <CheckCircle size={16} />
                     </button>
                     <button
-                      onClick={() => handleRejectArtwork(artwork.id)}
+                      onClick={() => handleRejectArtwork(artwork._id || artwork.id)}
                       className="flex-1 bg-red-600 text-white py-1 rounded"
                     >
                       <XCircle size={16} />
@@ -208,7 +208,7 @@ const Artworks = () => {
                 )}
 
                 <button
-                  onClick={() => handleDeleteArtwork(artwork.id)}
+                  onClick={() => handleDeleteArtwork(artwork._id || artwork.id)}
                   className="bg-red-100 text-red-600 px-2 rounded"
                 >
                   <Trash2 size={16} />
@@ -237,7 +237,7 @@ const Artworks = () => {
               </button>
               <button
                 onClick={async () => {
-                  await handleDeleteArtwork(selectedArtwork.id);
+                  await handleDeleteArtwork(selectedArtwork._id || selectedArtwork.id);
                   setShowModal(false);
                 }}
                 className="px-4 py-2 bg-red-600 text-white rounded"

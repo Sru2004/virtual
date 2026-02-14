@@ -22,6 +22,20 @@ const auth = async (req, res, next) => {
   }
 };
 
+/** Optional auth: set req.user if valid token, never 401. Use for public-ish routes (e.g. list published artworks). */
+const optionalAuth = async (req, res, next) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return next();
+    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+    const user = await User.findById(decoded.userId);
+    if (user) req.user = user;
+  } catch (_) {}
+  next();
+};
+
 const adminAuth = (req, res, next) => {
   if (req.user.user_type !== 'admin') {
     return res.status(403).json({ message: 'Admin access required' });
@@ -29,4 +43,4 @@ const adminAuth = (req, res, next) => {
   next();
 };
 
-module.exports = { auth, adminAuth };
+module.exports = { auth, optionalAuth, adminAuth };
