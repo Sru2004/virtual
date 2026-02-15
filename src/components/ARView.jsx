@@ -237,12 +237,12 @@ const ARArtwork = ({ imageUrl, onClose, onAddToCart, onBuyNow, onBack }) => {
         </Html>
       )}
 
-      {/* Instructions before placement */}
+      {/* Instructions before placement — camera is on, user sees the wall */}
       {!placed && (
         <Html center position={[0, 1.5, -2]}>
-          <div className="bg-black/70 text-white px-6 py-4 rounded-lg text-center">
-            <p className="text-lg font-semibold mb-2">Point your camera at a wall</p>
-            <p className="text-sm opacity-75">Tap the screen to place the artwork</p>
+          <div className="bg-black/70 text-white px-6 py-4 rounded-lg text-center max-w-[280px]">
+            <p className="text-lg font-semibold mb-2">Point at the wall</p>
+            <p className="text-sm opacity-90">Tap the screen to place the painting and see how it looks on the wall</p>
           </div>
         </Html>
       )}
@@ -276,15 +276,8 @@ const ARView = () => {
     fetchArtwork();
   }, [id]);
 
-  useEffect(() => {
-    if (startAR && arButtonRef.current) {
-      // Auto-click the ARButton to start the session
-      const timer = setTimeout(() => {
-        arButtonRef.current?.click();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [startAR]);
+  // Do not auto-click ARButton — browser requires a direct user gesture to allow camera/XR access.
+  // User must click "Start AR" themselves after "View in AR".
 
   const handleAddToCart = () => {
     const cart = JSON.parse(localStorage.getItem("cartItems") || "{}");
@@ -325,18 +318,35 @@ const ARView = () => {
 
   if (startAR) {
     return (
-      <div className="fixed inset-0 bg-black z-50">
-        <ARButton
-          ref={arButtonRef}
-          sessionInit={{
-            mode: 'immersive-ar',
-            requiredFeatures: ['hit-test'],
-            optionalFeatures: ['dom-overlay'],
-          }}
-          className="absolute top-4 left-4 z-10 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-        >
-          Start AR
-        </ARButton>
+      <div className="fixed inset-0 bg-black z-50 flex flex-col">
+        {/* Step 1: Ask user to start camera — must be a real click for browser to allow camera access */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-20 p-6 text-center">
+          <div className="bg-gray-900/90 text-white rounded-xl p-6 max-w-md mb-6">
+            <h2 className="text-xl font-semibold mb-4">View painting on your wall</h2>
+            <ol className="text-left space-y-3 text-sm mb-6">
+              <li><strong>1.</strong> Click <span className="text-purple-300">&quot;Start AR&quot;</span> below — your camera will turn on so you can see the wall.</li>
+              <li><strong>2.</strong> Point your phone at the wall where you want to see the painting.</li>
+              <li><strong>3.</strong> Tap the screen to place the artwork, then see how it looks on the wall.</li>
+            </ol>
+            <ARButton
+              ref={arButtonRef}
+              sessionInit={{
+                mode: 'immersive-ar',
+                requiredFeatures: ['hit-test'],
+                optionalFeatures: ['dom-overlay'],
+              }}
+              className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+            >
+              Start AR (open camera)
+            </ARButton>
+          </div>
+          <button
+            onClick={() => setStartAR(false)}
+            className="text-gray-400 hover:text-white text-sm"
+          >
+            Cancel
+          </button>
+        </div>
 
         <Canvas>
           <XR
@@ -348,7 +358,6 @@ const ARView = () => {
           >
             <Controllers />
             <Hands />
-
             <Suspense fallback={null}>
               <ARArtwork
                 imageUrl={artwork.image_url}
@@ -361,16 +370,11 @@ const ARView = () => {
           </XR>
         </Canvas>
 
-        {/* Instructions overlay */}
-        <div className="absolute top-4 left-4 right-4 z-10 bg-black bg-opacity-50 text-white p-4 rounded-lg">
-          <p className="text-sm mb-2">Point your camera at a wall or flat surface</p>
-          <p className="text-xs opacity-75">Tap the screen to place the artwork</p>
-        </div>
-
-        {/* Close button */}
+        {/* Close button when in AR session — shown by AR content */}
         <button
           onClick={() => setStartAR(false)}
-          className="absolute top-4 right-4 z-10 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          className="absolute top-4 right-4 z-10 px-4 py-2 bg-red-600/90 text-white rounded-lg hover:bg-red-700"
+          aria-label="Close AR"
         >
           Close AR
         </button>

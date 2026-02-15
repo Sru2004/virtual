@@ -21,13 +21,17 @@ router.post('/register', [
   body('full_name').notEmpty(),
   body('user_type').isIn(['artist', 'user', 'admin'])
 ], async (req, res) => {
+  if (mongoose.connection.readyState !== 1) {
+    console.warn('[Auth] Register rejected: MongoDB not connected');
+    return res.status(503).json({ message: 'Database not connected. Restart the backend and check Atlas Network Access.', code: 'DB_DISCONNECTED' });
+  }
   const dbName = mongoose.connection.db?.databaseName || 'unknown';
-  const isConnected = mongoose.connection.readyState === 1;
-  console.log(`[Auth] Register: email=${req.body?.email || ''}, DB connected=${isConnected}, database=${dbName}`);
+  console.log(`[Auth] Register: email=${req.body?.email || ''}, database=${dbName}`);
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      const firstMsg = errors.array()[0]?.msg || 'Validation failed';
+      return res.status(400).json({ message: firstMsg, errors: errors.array() });
     }
 
     const { email, password, full_name, user_type, phone, profile_picture, address, artist_name, bio, portfolio_link } = req.body;
@@ -79,13 +83,14 @@ router.post('/register', [
 
 // Login (artist and user share same endpoint)
 router.post('/login', [
-  body('email').isEmail().normalizeEmail(),
-  body('password').exists().trim()
+  body('email').isEmail().normalizeEmail().withMessage('Please enter a valid email address'),
+  body('password').exists({ checkFalsy: false }).trim().notEmpty().withMessage('Password is required')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      const firstMsg = errors.array()[0]?.msg || 'Invalid email or password';
+      return res.status(400).json({ message: firstMsg, errors: errors.array() });
     }
 
     const { email, password } = matchedData(req);

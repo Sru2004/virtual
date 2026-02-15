@@ -1,0 +1,23 @@
+# Render.com Blueprint - deploy backend as a Web Service
+# Docs: https://render.com/docs/blueprint-spec
+# Put this file at repo root; set Root Directory to "backend" in Render dashboard if not using Blueprint.
+services:
+  - type: web
+    name: visualart-api
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PORT
+        value: 5000
+      - key: FRONTEND_URL
+        sync: false

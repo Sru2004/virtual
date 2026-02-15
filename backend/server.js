@@ -9,11 +9,15 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 
-// Middleware — allow any localhost port so frontend works regardless of Vite port
+// Middleware — allow localhost (dev) and production frontend (FRONTEND_URL / Vercel)
 const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176', 'http://localhost:5177', 'http://localhost:5178', 'http://localhost:5179', 'http://localhost:5180', 'http://localhost:5181', 'http://localhost:5182', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:5175', 'http://127.0.0.1:5176', 'http://127.0.0.1:5177', 'http://127.0.0.1:5178', 'http://127.0.0.1:5179', 'http://127.0.0.1:5180', 'http://10.67.109.231:5174', 'https://new-sigma-lime-91.vercel.app'];
+const frontendUrl = process.env.FRONTEND_URL || '';
+if (frontendUrl) allowedOrigins.push(frontendUrl);
+// Allow any Vercel preview (*.vercel.app)
+const isVercelOrigin = (o) => o && /^https:\/\/[^.]+\.vercel\.app$/.test(o);
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin) || /^https?:\/\/localhost(:\d+)?$/.test(origin) || /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return cb(null, true);
+    if (!origin || allowedOrigins.includes(origin) || isVercelOrigin(origin) || /^https?:\/\/localhost(:\d+)?$/.test(origin) || /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return cb(null, true);
     cb(null, false);
   },
   credentials: true,
@@ -97,9 +101,7 @@ const connectDB = async () => {
         if (mongoose.connection.readyState !== 0) {
           try {
             await mongoose.disconnect();
-          } catch (_) {
-            
-          }
+          } catch (_) {}
         }
       }
     }
@@ -122,9 +124,9 @@ let dbConnected = false;
 app.use('/api', (req, res, next) => {
   if (req.path === '/health') return next();
   if (!dbConnected) {
-    console.warn('[503] Request rejected: database not connected. Check http://localhost:5000/api/health and whitelist your IP in Atlas → Network Access.');
+    console.warn('[503] Request rejected: database not connected. Data will NOT be saved. Check http://localhost:5000/api/health');
     return res.status(503).json({
-      message: 'Database not connected. Whitelist your IP in MongoDB Atlas → Network Access (e.g. 157.32.122.224/32), then restart the backend.',
+      message: 'Database not connected — data cannot be saved. 1) Open http://localhost:5000/api/health  2) Whitelist your IP in Atlas → Network Access  3) Restart backend: npm run start:fresh',
       code: 'DB_DISCONNECTED',
     });
   }
@@ -219,4 +221,4 @@ function scheduleReconnect() {
   }, 10000);
 }
 
-module.exports = app;
+module.exports = app;  
