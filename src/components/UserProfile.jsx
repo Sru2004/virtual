@@ -1,25 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Mail,
-  Phone,
-  MapPin,
   Edit,
   Heart,
-  Star,
-  LogOut,
-  HelpCircle,
-  Truck,
   Settings,
   ChevronRight,
   Save,
   Camera,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import { toastSuccess, toastError } from '../lib/toast';
 
 const UserProfile = () => {
-  const { user, profile, logout, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const [activeSection, setActiveSection] = useState('account');
   const [isEditing, setIsEditing] = useState(false);
   const [wishlist, setWishlist] = useState([]);
@@ -108,37 +102,40 @@ const UserProfile = () => {
 
 
   const handleSaveChanges = async () => {
+    const profileId = profile?.id ?? user?.id ?? user?._id;
+    if (!profileId) {
+      toastError('Session expired or profile not loaded. Please refresh the page and try again.');
+      return;
+    }
+
     try {
       const fullName = `${formData.firstName} ${formData.lastName}`.trim();
       const updates = {
-        full_name: fullName,
-        phone: formData.mobile,
-        address: formData.address,
-        gender: formData.gender,
-        dateOfBirth: formData.dateOfBirth,
-        city: formData.city,
-        state: formData.state,
-        country: formData.country,
+        full_name: fullName || undefined,
+        phone: formData.mobile || undefined,
+        address: formData.address || undefined,
+        gender: formData.gender || undefined,
+        dateOfBirth: formData.dateOfBirth || undefined,
+        city: formData.city || undefined,
+        state: formData.state || undefined,
+        country: formData.country || undefined,
       };
 
-      if (profilePictureFile) {
-        // In a real app, you'd upload the file to a storage service first
-        // For now, we'll use the data URL from the file reader
+      if (profilePictureFile && formData.profilePicture) {
         updates.profile_picture = formData.profilePicture;
       }
 
-      const response = await api.updateProfile(user?._id || '', updates);
+      await api.updateProfile(profileId, updates);
 
       setIsEditing(false);
-      // Refresh profile data without full page reload
       await loadProfileData();
-      // Refresh the auth context to update navbar
       await refreshProfile();
 
       toastSuccess('Profile updated successfully!');
     } catch (error) {
       console.error('Error updating profile:', error);
-      toastError('Failed to update profile. Please try again.');
+      const message = error?.message || 'Failed to update profile. Please try again.';
+      toastError(message);
     }
   };
 
@@ -408,9 +405,35 @@ const UserProfile = () => {
                     </div>
                   </div>
 
-                  {/* Edit Profile removed: use profile dropdown in Navbar only */}
-
-                  {/* Logout removed: use profile dropdown logout in Navbar only */}
+                  {/* Edit/Save/Cancel Buttons */}
+                  <div className="flex justify-end gap-3 mb-6">
+                    {!isEditing ? (
+                      <button
+                        onClick={() => setIsEditing(true)}
+                        className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit Profile
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setIsEditing(false)}
+                          className="flex items-center gap-2 px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveChanges}
+                          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          <Save className="h-4 w-4" />
+                          Save Changes
+                        </button>
+                      </>
+                    )}
+                  </div>
 
                   {/* FAQ Section */}
                   <div className="border-t border-gray-200 pt-8">

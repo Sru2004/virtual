@@ -21,3 +21,6 @@ dist-ssr
 *.sln
 *.sw?
 .env
+backend/.env
+backend/uploads/
+"backend/server.js User)."

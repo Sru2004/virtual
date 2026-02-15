@@ -210,8 +210,14 @@ const EditArtistProfile = () => {
     setSuccess(false);
     setError(null);
 
+    const profileId = artistProfile?.id ?? artistProfile?._id;
+    if (!profileId) {
+      setError('Artist profile not loaded. Please refresh and try again.');
+      setLoading(false);
+      return;
+    }
     try {
-      await api.updateArtistProfile(artistProfile.id, formData);
+      await api.updateArtistProfile(profileId, formData);
       await refreshProfile();
       setSuccess(true);
       setTimeout(() => {

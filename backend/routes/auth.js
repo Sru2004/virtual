@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult, matchedData } = require('express-validator');
@@ -20,6 +21,9 @@ router.post('/register', [
   body('full_name').notEmpty(),
   body('user_type').isIn(['artist', 'user', 'admin'])
 ], async (req, res) => {
+  const dbName = mongoose.connection.db?.databaseName || 'unknown';
+  const isConnected = mongoose.connection.readyState === 1;
+  console.log(`[Auth] Register: email=${req.body?.email || ''}, DB connected=${isConnected}, database=${dbName}`);
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -50,6 +54,8 @@ router.post('/register', [
     });
 
     await user.save();
+    const dbName = mongoose.connection.db?.databaseName || 'unknown';
+    console.log(`[Auth] User saved to database "${dbName}", collection "users", id: ${user._id}`);
 
     // Create artist profile if user_type is artist
     if (user_type === 'artist' && artist_name && bio) {

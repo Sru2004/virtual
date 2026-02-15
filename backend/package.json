@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "start:fresh": "node scripts/start-fresh.js",
     "dev": "nodemon server.js",
     "server": "node server.js",
     "test": "jest"

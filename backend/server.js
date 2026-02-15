@@ -1,18 +1,21 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const bcrypt = require('bcryptjs');
 const dotenv = require('dotenv');
 const path = require('path');
-const User = require('./models/User');
 
-dotenv.config();
+// Load .env from backend directory so MONGODB_URI is always found (even when run from project root)
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 
-// Middleware
+// Middleware — allow any localhost port so frontend works regardless of Vite port
+const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176', 'http://localhost:5177', 'http://localhost:5178', 'http://localhost:5179', 'http://localhost:5180', 'http://localhost:5181', 'http://localhost:5182', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:5175', 'http://127.0.0.1:5176', 'http://127.0.0.1:5177', 'http://127.0.0.1:5178', 'http://127.0.0.1:5179', 'http://127.0.0.1:5180', 'http://10.67.109.231:5174', 'https://new-sigma-lime-91.vercel.app'];
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5177', 'http://localhost:5178', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:5175', 'http://127.0.0.1:5177', 'http://127.0.0.1:5178', 'http://10.67.109.231:5174', 'https://new-sigma-lime-91.vercel.app'],
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin) || /^https?:\/\/localhost(:\d+)?$/.test(origin) || /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return cb(null, true);
+    cb(null, false);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -28,18 +31,17 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 
 
-// MongoDB: prefer MONGODB_URI from .env; else try Atlas; fallback to local
-const atlasUri = 'mongodb+srv://srujana:Srujana123@cluster0.37lwfdw.mongodb.net/?appName=Cluster0&directConnection=true';
-const localUri = 'mongodb://localhost:27017/visualart';
-const primaryUri = process.env.MONGODB_URI || atlasUri;
+// MongoDB: use MONGODB_URI from .env (e.g. Atlas mongodb+srv://...) or fallback to local
+const localUri = 'mongodb://localhost:27017/test';
+const primaryUri = process.env.MONGODB_URI || localUri;
 
-const isAtlasUri = (uri) => uri && uri.startsWith('mongodb+srv://');
+const isAtlasUri = (uri) => uri && (uri.startsWith('mongodb+srv://') || uri.includes('ssl=true'));
 
 const connectWithUri = async (uri, label) => {
   const options = {
-    serverSelectionTimeoutMS: 10000,
+    serverSelectionTimeoutMS: 15000,
     socketTimeoutMS: 45000,
-    connectTimeoutMS: 10000,
+    connectTimeoutMS: 15000,
     bufferCommands: false,
     maxPoolSize: 10,
     minPoolSize: 1,
@@ -58,8 +60,14 @@ const connectWithUri = async (uri, label) => {
       setTimeout(() => reject(new Error('Connection timeout')), 10000);
     }
   });
-  const dbName = (uri.includes('/') ? uri.split('/').pop().split('?')[0] : '') || 'visualart';
-  console.log(`✅ MongoDB connected (${label}: ${dbName})`);
+  const dbName = (uri.includes('/') ? uri.split('/').pop().split('?')[0] : '') || 'test';
+  console.log(`✅ MongoDB connected (${label}): database "${dbName}" — data will be saved here.`);
+  // Ensure collections exist in this database (Mongoose creates on first write; this creates them upfront in Atlas)
+  const db = mongoose.connection.db;
+  const collections = ['users', 'addresses', 'wishlists', 'artworks', 'orders', 'reviews', 'artistprofiles'];
+  for (const collName of collections) {
+    await db.createCollection(collName).catch(() => {});
+  }
   return true;
 };
 
@@ -70,9 +78,10 @@ const connectDB = async () => {
     urisToTry.push(localUri);
   }
 
+  const uriLabel = (uri) => (uri === localUri ? 'local' : 'MONGODB_URI');
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     for (const uri of urisToTry) {
-      const label = uri === localUri ? 'local' : (uri === atlasUri ? 'Atlas' : 'MONGODB_URI');
+      const label = uriLabel(uri);
       try {
         if (mongoose.connection.readyState === 1) {
           return true;
@@ -88,7 +97,9 @@ const connectDB = async () => {
         if (mongoose.connection.readyState !== 0) {
           try {
             await mongoose.disconnect();
-          } catch (_) {}
+          } catch (_) {
+            
+          }
         }
       }
     }
@@ -98,9 +109,9 @@ const connectDB = async () => {
     }
   }
 
-  console.error('❌ Could not connect to MongoDB. Options:');
-  console.log('  1. Use local: install MongoDB and run it, then restart backend.');
-  console.log('  2. Use Atlas: set MONGODB_URI in backend/.env and whitelist your IP at https://cloud.mongodb.com → Network Access.');
+  console.error('❌ Could not connect to MongoDB. Data will NOT be saved until connected.');
+  console.log('  Atlas: whitelist your IP at https://cloud.mongodb.com → Network Access (e.g. 157.32.122.224/32).');
+  console.log('  Then restart backend: npm run start:fresh');
   return false;
 };
 
@@ -111,8 +122,9 @@ let dbConnected = false;
 app.use('/api', (req, res, next) => {
   if (req.path === '/health') return next();
   if (!dbConnected) {
+    console.warn('[503] Request rejected: database not connected. Check http://localhost:5000/api/health and whitelist your IP in Atlas → Network Access.');
     return res.status(503).json({
-      message: 'Database temporarily unavailable. Please check MongoDB connection (e.g. Atlas IP whitelist).',
+      message: 'Database not connected. Whitelist your IP in MongoDB Atlas → Network Access (e.g. 157.32.122.224/32), then restart the backend.',
       code: 'DB_DISCONNECTED',
     });
   }
@@ -132,37 +144,59 @@ app.use('/api/admin', require('./routes/admin'));
 
 // Health check (always responds; indicates DB status)
 app.get('/api/health', (req, res) => {
+  const dbName = mongoose.connection.db?.databaseName || null;
   res.json({
     status: dbConnected ? 'OK' : 'DEGRADED',
     message: 'VisualArt Backend is running',
     database: dbConnected ? 'connected' : 'disconnected',
+    databaseName: dbName,
+    note: !dbConnected ? 'Data will NOT be saved until MongoDB is connected. Restart backend from backend folder and check Atlas IP whitelist.' : null,
   });
 });
 
 const PORT = process.env.PORT || 5000;
 
 // Start HTTP server immediately so frontend can connect; connect DB in background
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`API: http://localhost:${PORT}/api`);
+});
+
+// Handle port binding errors (e.g., EADDRINUSE)
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Port ${PORT} is already in use. Data may not be saving because the OLD process may not be connected to MongoDB.`);
+    console.error(`Fix: Stop the process on port ${PORT}, then run "npm run start" from the backend folder.`);
+    console.error(`  Windows: netstat -ano | findstr :${PORT}   then  taskkill /PID <number> /F`);
+    process.exit(1);
+  } else {
+    console.error('Server error:', err);
+    process.exit(1);
+  }
 });
 
 function setDbConnected(connected) {
   dbConnected = !!connected;
 }
 
+// Log which MongoDB we're using (mask credentials)
+const safeUri = primaryUri.replace(/:[^:@]+@/, ':****@').replace(/\?.*$/, '');
+console.log('MongoDB: using', process.env.MONGODB_URI ? `MONGODB_URI (${safeUri})` : 'local (localhost:27017/test)');
+
 connectDB()
   .then((connected) => {
     setDbConnected(connected);
     if (connected) {
-      console.log('Backend ready. Database connected.');
+      const dbName = mongoose.connection.db?.databaseName || 'test';
+      console.log(`Backend ready. Data will be saved to Atlas database "${dbName}" (users, orders, etc.).`);
     } else {
-      console.warn('Backend is up but database is not connected. API will return 503 until MongoDB is available.');
+      console.warn('Backend is up but database is NOT connected. Signup/login will return 503. Whitelist IP in Atlas and run: npm run start:fresh');
       scheduleReconnect();
     }
   })
-  .catch(() => {
+  .catch((err) => {
     setDbConnected(false);
+    console.error('DB connection error:', err?.message || err);
     scheduleReconnect();
   });
 

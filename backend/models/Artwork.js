@@ -28,12 +28,10 @@ const artworkSchema = new mongoose.Schema({
   imageHash: {
     type: String,
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   perceptualHash: {
-    type: String,
-    index: true
+    type: String
   },
   tags: [String],
   size: {
@@ -68,8 +66,7 @@ const artworkSchema = new mongoose.Schema({
   }
 });
 
-// Indexes for efficient duplicate detection
-artworkSchema.index({ imageHash: 1 }, { unique: true });
+// Indexes for efficient duplicate detection (imageHash index comes from schema unique: true)
 artworkSchema.index({ perceptualHash: 1 });
 artworkSchema.index({ artist_id: 1, created_at: -1 });
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import { toast } from 'react-hot-toast';
@@ -48,10 +48,10 @@ const MyOrders = () => {
                                 <div className='bg-gray-50 px-6 py-4 border-b border-gray-200'>
                                     <div className='flex flex-col md:flex-row md:items-center justify-between gap-4'>
                                         <div className='flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6'>
-                                            <span className='text-sm text-gray-600'>Order ID: <span className='font-medium text-gray-800'>{order._id}</span></span>
+                                        <span className='text-sm text-gray-600'>Order ID: <span className='font-medium text-gray-800'>{order._id}</span></span>
                                             <span className='text-sm text-gray-600'>Payment: <span className='font-medium text-gray-800'>{order.paymentType || 'COD'}</span></span>
                                         </div>
-                                        <span className='text-lg font-bold text-amber-600'>Total: ₹{order.amount}</span>
+                                        <span className='text-lg font-bold text-amber-600'>Total: ₹{order.total_amount || order.amount}</span>
                                     </div>
                                 </div>
 
@@ -61,8 +61,8 @@ const MyOrders = () => {
                                             <div className='flex items-center gap-4 flex-shrink-0'>
                                                 <div className='bg-gray-100 p-3 rounded-lg'>
                                                     <img
-                                                        src={item.product.image_url || 'https://images.pexels.com/photos/1266808/pexels-photo-1266808.jpeg'}
-                                                        alt={item.product.title}
+                                                        src={item.product?.image_url || 'https://images.pexels.com/photos/1266808/pexels-photo-1266808.jpeg'}
+                                                        alt={item.product?.title || 'Artwork'}
                                                         className='w-16 h-16 object-cover rounded'
                                                         onError={(e) => {
                                                             e.currentTarget.src = 'https://images.pexels.com/photos/1266808/pexels-photo-1266808.jpeg';
@@ -70,9 +70,9 @@ const MyOrders = () => {
                                                     />
                                                 </div>
                                                 <div>
-                                                    <h3 className='text-lg font-semibold text-gray-800'>{item.product.title}</h3>
-                                                    <p className='text-sm text-gray-600'>Category: {item.product.category}</p>
-                                                    <p className='text-sm text-gray-600'>Medium: {item.product.medium || 'N/A'}</p>
+                                                    <h3 className='text-lg font-semibold text-gray-800'>{item.product?.title || 'Artwork'}</h3>
+                                                    <p className='text-sm text-gray-600'>Category: {item.product?.category || 'N/A'}</p>
+                                                    <p className='text-sm text-gray-600'>Medium: {item.product?.medium || 'N/A'}</p>
                                                 </div>
                                             </div>
 
@@ -80,10 +80,10 @@ const MyOrders = () => {
                                                 <div className='flex flex-col gap-1'>
                                                     <span className='text-sm text-gray-600'>Quantity: <span className='font-medium'>{item.quantity}</span></span>
                                                     <span className='text-sm text-gray-600'>Status: <span className={`font-medium ${order.status === 'completed' ? 'text-green-600' : order.status === 'pending' ? 'text-yellow-600' : 'text-red-600'}`}>{order.status}</span></span>
-                                                    <span className='text-sm text-gray-600'>Date: <span className='font-medium'>{new Date(order.order_date).toLocaleDateString()}</span></span>
+                                                    <span className='text-sm text-gray-600'>Date: <span className='font-medium'>{order.order_date ? new Date(order.order_date).toLocaleDateString() : 'N/A'}</span></span>
                                                 </div>
                                                 <div className='text-right'>
-                                                    <p className='text-lg font-bold text-amber-600'>₹{item.product.price * item.quantity}</p>
+                                                    <p className='text-lg font-bold text-amber-600'>₹{(item.product?.price || 0) * item.quantity}</p>
                                                 </div>
                                             </div>
                                         </div>
