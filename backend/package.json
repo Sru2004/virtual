@@ -2,14 +2,15 @@
   "name": "visualart-backend",
   "version": "1.0.0",
   "description": "Backend API for VisualArt marketplace",
-  "main": "server.js",
+"main": "server.js",
   "scripts": {
     "start": "node server.js",
     "start:fresh": "node scripts/start-fresh.js",
     "dev": "nodemon server.js",
     "server": "node server.js",
     "test": "jest",
-    "check-db": "node check-connection.js"
+    "check-db": "node check-connection.js",
+    "build": "echo 'No build required for backend'"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
