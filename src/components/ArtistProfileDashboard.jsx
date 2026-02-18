@@ -186,26 +186,53 @@ const ArtistProfileDashboard = () => {
   const calculateStats = (artworkData, orderData, reviewData) => {
     try {
       const totalUploads = artworkData?.length || 0;
-      const totalLikes = artworkData?.reduce((sum, art) => sum + (art.likes_count || 0), 0) || 0;
-      const pendingApprovals = artworkData?.filter((art) => art.status === 'pending').length || 0;
 
-      let totalSales = 0;
+      // Count likes only on artworks that actually appear in this artist's orders,
+      // so Likes reflects engagement on ordered pieces.
+      const orderedArtworkIds = new Set();
+      (orderData || []).forEach((order) => {
+        (order.items || []).forEach((item) => {
+          const product = item?.product;
+          const id = product && (product._id || product.id);
+          if (id) orderedArtworkIds.add(id);
+        });
+      });
+
+      const totalLikes =
+        artworkData
+          ?.filter((art) => {
+            const id = art._id || art.id;
+            return id && orderedArtworkIds.has(id);
+          })
+          .reduce((sum, art) => sum + (art.likes_count || 0), 0) || 0;
+
+      // Pending reflects pending orders for this artist.
+      const pendingApprovals =
+        orderData?.filter((o) => o.status === 'pending').length || 0;
+
+      // Sales = number of orders for this artist.
+      const totalOrders = orderData?.length || 0;
+
+      let totalSales = totalOrders;
       let avgRating = 0;
 
-      if (artistProfile) {
-        totalSales = artistProfile.total_sales || orderData?.filter(o => o.status === 'completed').length || 0;
-        avgRating = artistProfile.avg_rating || 0;
-      } else {
-        totalSales = orderData?.filter(o => o.status === 'completed').length || 0;
-        if (reviewData && reviewData.length > 0) {
-          avgRating = reviewData.reduce((sum, r) => sum + r.rating, 0) / reviewData.length;
-        }
+      if (artistProfile?.avg_rating) {
+        avgRating = artistProfile.avg_rating;
+      } else if (reviewData && reviewData.length > 0) {
+        avgRating =
+          reviewData.reduce((sum, r) => sum + r.rating, 0) / reviewData.length;
       }
 
       setStats({ totalUploads, totalSales, totalLikes, avgRating, pendingApprovals });
     } catch (error) {
       console.error('Error calculating stats:', error);
-      setStats({ totalUploads: 0, totalSales: 0, totalLikes: 0, avgRating: 0, pendingApprovals: 0 });
+      setStats({
+        totalUploads: 0,
+        totalSales: 0,
+        totalLikes: 0,
+        avgRating: 0,
+        pendingApprovals: 0,
+      });
     }
   };
 

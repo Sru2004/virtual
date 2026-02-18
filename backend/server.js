@@ -42,6 +42,15 @@ const primaryUri = process.env.MONGODB_URI || localUri;
 const isAtlasUri = (uri) => uri && (uri.startsWith('mongodb+srv://') || uri.includes('ssl=true'));
 
 const connectWithUri = async (uri, label) => {
+  // Disconnect if already connected or connecting
+  if (mongoose.connection.readyState !== 0) {
+    try {
+      await mongoose.disconnect();
+    } catch (err) {
+      // Ignore disconnect errors
+    }
+  }
+  
   const options = {
     serverSelectionTimeoutMS: 15000,
     socketTimeoutMS: 45000,
@@ -101,7 +110,7 @@ const connectDB = async () => {
         if (mongoose.connection.readyState !== 0) {
           try {
             await mongoose.disconnect();
-          } catch (_) {}
+          } catch { /* ignore disconnect errors */ }
         }
       }
     }
@@ -112,8 +121,15 @@ const connectDB = async () => {
   }
 
   console.error('❌ Could not connect to MongoDB. Data will NOT be saved until connected.');
-  console.log('  Atlas: whitelist your IP at https://cloud.mongodb.com → Network Access (e.g. 157.32.122.224/32).');
-  console.log('  Then restart backend: npm run start:fresh');
+  console.log('');
+  console.log('  🔧 TO FIX:');
+  console.log('  1. Get your current IP: Run "node check-connection.js" or visit https://api.ipify.org');
+  console.log('  2. Go to: https://cloud.mongodb.com/v2#/security/network/whitelist');
+  console.log('  3. Click "Add IP Address"');
+  console.log('  4. Enter your IP with /32 (e.g., 152.58.14.228/32)');
+  console.log('  5. Or use 0.0.0.0/0 to allow from anywhere (testing only)');
+  console.log('  6. Wait 1-2 minutes, then restart: npm run start:fresh');
+  console.log('');
   return false;
 };
 

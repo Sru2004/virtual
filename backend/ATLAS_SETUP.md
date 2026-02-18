@@ -7,7 +7,8 @@
 
 2. **Whitelist your IP in Atlas**
    - Go to [MongoDB Atlas](https://cloud.mongodb.com) → **Network Access** → **Add IP Address**.
-   - Add **157.32.122.224** (or use "Add Current IP Address" from the machine running the backend).
+   - Add your current IP address (run `npm run check-db` to see your IP) or use "Add Current IP Address"
+   - Example: **152.58.14.228/32** (your IP may be different - check with the diagnostic script)
    - Wait ~1 minute, then restart the backend.
 
 3. **Restart backend so it connects to Atlas**

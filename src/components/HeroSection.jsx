@@ -1,7 +1,22 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import img4 from "../assets/img4.png";
 
 export default function HeroSection() {
+    const navigate = useNavigate();
+    const { user } = useAuth();
+
+    const handleExploreClick = () => {
+        // If not logged in, send user to login before exploring gallery
+        if (!user) {
+            navigate('/login');
+        } else {
+            // Logged-in users go directly to the gallery/search page
+            navigate('/search');
+        }
+    };
+
     return (
         <div className="relative bg-gradient-to-br from-amber-50 via-white to-rose-50 py-20 overflow-hidden">
             {/* Background Image */}
@@ -24,7 +39,10 @@ export default function HeroSection() {
                     Your gateway to the digital art marketplace.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <button className="px-8 py-3 bg-gradient-to-r from-amber-500 to-rose-500 text-white rounded-lg hover:shadow-lg transition-shadow font-semibold">
+                    <button
+                        onClick={handleExploreClick}
+                        className="px-8 py-3 bg-gradient-to-r from-amber-500 to-rose-500 text-white rounded-lg hover:shadow-lg transition-shadow font-semibold"
+                    >
                         Explore Artworks
                     </button>
                     <button className="px-8 py-3 border-2 border-amber-500 text-amber-600 rounded-lg hover:bg-amber-50 transition-colors font-semibold flex items-center gap-2">

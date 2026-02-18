@@ -16,10 +16,23 @@ router.get('/', auth, async (req, res) => {
     if (req.user.user_type === 'admin') {
       // Admin can see all orders
     } else if (req.user.user_type === 'artist') {
-      // Artists can see orders for their artworks
+      // Artists can see orders for their artworks.
+      // Artworks may store either the artist's user _id or the artist profile _id in artist_id,
+      // so we mirror the same logic used in /artworks/my-artworks.
       const artistProfile = await ArtistProfile.findOne({ user_id: req.user._id });
-      if (artistProfile) {
-        query['items.product'] = { $in: await Artwork.find({ artist_id: artistProfile._id }).select('_id') };
+
+      const artistIds = [req.user._id];
+      if (artistProfile) artistIds.push(artistProfile._id);
+
+      const artistArtworks = await Artwork.find({ artist_id: { $in: artistIds } }).select('_id');
+      const artworkIds = artistArtworks.map((a) => a._id);
+
+      // If the artist has artworks, restrict orders to those that include at least one of them.
+      if (artworkIds.length > 0) {
+        query['items.product'] = { $in: artworkIds };
+      } else {
+        // No artworks means no orders for this artist.
+        query['items.product'] = { $in: [] };
       }
     } else {
       // Regular users can see their own orders
@@ -30,7 +43,8 @@ router.get('/', auth, async (req, res) => {
       .populate('user_id', 'full_name email')
       .populate({
         path: 'items.product',
-        select: 'title price category image_url medium'
+        // Include artist_id so the artist dashboard can filter orders reliably.
+        select: 'title price category image_url medium artist_id'
       })
       .populate('address', 'firstName lastName street city state country phone')
       .sort({ order_date: -1 });
