@@ -46,9 +46,6 @@ const LoginSelect = ({ onSelect }) => {
                 <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm">
                   Upload Art
                 </span>
-                <span className="px-3 py-1 bg-rose-100 text-rose-700 rounded-full text-sm">
-                  Manage Sales
-                </span>
                 <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm">
                   Build Portfolio
                 </span>
